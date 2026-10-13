@@ -3,6 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "description": "Wall-E – go-e Wallbox Tracker: Live-Status, Ladevorgänge und faire Kostenaufteilung",
+  "author": "flexi03",
   "type": "module",
   "scripts": {
     "dev": "vite",

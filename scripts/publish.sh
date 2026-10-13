@@ -3,7 +3,7 @@
 # Das private Repo bleibt unverändert. Das öffentliche Repo hat eine eigene Historie (keine alten Commits).
 #
 #   scripts/publish.sh "Nachricht"      Ziel: $WALL_E_PUBLIC_DIR oder ~/wall-e-public
-#   Autor der Commits: $WALL_E_PUBLIC_NAME / $WALL_E_PUBLIC_EMAIL (Standard: neutral, siehe unten)
+#   Autor der Commits: WALL_E_PUBLIC_NAME / WALL_E_PUBLIC_EMAIL (einmal setzen, siehe unten)
 #
 # Ablauf: Dateien kopieren (ohne .publishignore) → nach privaten Daten suchen (.publish-denylist und
 # typische Schlüssel/Tokens) → Tests und Build im Ziel → Commit. Bei einem Fund wird abgebrochen.
@@ -59,10 +59,16 @@ rm -rf "$DEST/dist"
 # 4. Commit im öffentlichen Repo
 cd "$DEST"
 [[ -d .git ]] || git init -q -b main
-# Eigener Autor nur für dieses Repo (sonst landen Name und private Mail aus der globalen Git-Konfiguration öffentlich).
-# Anpassen z. B. mit WALL_E_PUBLIC_NAME="dein-github-name" WALL_E_PUBLIC_EMAIL="123+name@users.noreply.github.com"
-git config user.name "${WALL_E_PUBLIC_NAME:-$(git config --local user.name 2>/dev/null || echo 'Wall-E')}"
-git config user.email "${WALL_E_PUBLIC_EMAIL:-$(git config --local user.email 2>/dev/null || echo 'wall-e@users.noreply.github.com')}"
+# Autor nur für dieses Repo: GitHub-Konto mit der noreply-Adresse (die private Mail aus der globalen
+# Git-Konfiguration bleibt so verborgen). Einmal setzen, z. B.:
+#   WALL_E_PUBLIC_NAME="flexi03" WALL_E_PUBLIC_EMAIL="<id>+flexi03@users.noreply.github.com" scripts/publish.sh "…"
+# (die ID liefert: gh api user --jq .id). Danach bleibt der Wert in .git/config des öffentlichen Repos.
+[[ -n "${WALL_E_PUBLIC_NAME:-}" ]] && git config user.name "$WALL_E_PUBLIC_NAME"
+[[ -n "${WALL_E_PUBLIC_EMAIL:-}" ]] && git config user.email "$WALL_E_PUBLIC_EMAIL"
+if ! git config --local user.email >/dev/null; then
+  echo "Bitte Autor setzen: WALL_E_PUBLIC_NAME und WALL_E_PUBLIC_EMAIL (GitHub-noreply-Adresse)."
+  exit 1
+fi
 git add -A
 if git diff --cached --quiet; then
   echo "Keine Änderungen – nichts zu committen."
