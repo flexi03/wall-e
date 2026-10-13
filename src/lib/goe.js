@@ -126,7 +126,7 @@ export function demoStatus() {
     car: 2,
     nrg: [...voltage, 0, ...current, ...power, 0, power.reduce((a, b) => a + b, 0), 99, 99, 99, 0],
     wh: 12400 + Math.round(Math.random() * 300),
-    eto: 18432,
+    eto: 2264100, // Wh, passend zur Summe der Demo-Karten
     amp: 11,
     ama: 16,
     psm: 0,
