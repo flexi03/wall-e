@@ -68,4 +68,8 @@ Danach die Seite auf dem Handy öffnen, Seriennummer und API-Token eintragen und
 - `docs/DATA.md` – gespeicherte Daten, Rechenwege, Teilen-Format
 - `CHANGELOG.md`
 
+## Lizenz
+
+MIT – siehe `LICENSE`.
+
 Wall-E ist nicht mit go-e verbunden; „go-e“ ist eine Marke der go-e GmbH.

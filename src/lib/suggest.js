@@ -11,12 +11,26 @@ export const MATCH_TOLERANCE = 0.25; // höchstens 25 % Abweichung von der typis
 export const MIN_GAP = 0.15; // die zweitbeste Person muss deutlich schlechter passen
 export const MIN_LEARN_SAMPLES = 3; // so viele Ladevorgänge braucht es zum Lernen
 
-// Dauer, Durchschnitts- und Spitzenleistung
+/**
+ * Zeiten und Leistung eines Ladevorgangs.
+ * - connectedHours: angesteckt (Start bis Ende)
+ * - chargingHours: Strom floss wirklich (go-e "seconds_charged") – nur diese Zeit zählt für die Ø-Leistung
+ * - idleHours: Standzeit = angesteckt, aber ohne Laden
+ */
 export function sessionStats(session) {
-  const hours = session.chargedSeconds > 0 ? session.chargedSeconds / 3600 : (session.end - session.start) / 3600000;
-  const avgKw = hours > 0 && session.kwh > 0 ? session.kwh / hours : null;
+  const connectedHours = session.end > session.start ? (session.end - session.start) / 3600000 : null;
+  const chargingHours = session.chargedSeconds > 0 ? session.chargedSeconds / 3600 : null;
+  const idleHours = connectedHours !== null && chargingHours !== null ? Math.max(0, connectedHours - chargingHours) : null;
+  const avgKw = chargingHours && session.kwh > 0 ? session.kwh / chargingHours : null;
   const peakKw = typeof session.maxKw === 'number' && session.maxKw > 0 ? session.maxKw : null;
-  return { hours: hours > 0 ? hours : null, avgKw, peakKw };
+  return {
+    connectedHours,
+    chargingHours,
+    idleHours,
+    chargingShare: connectedHours && chargingHours !== null ? Math.min(1, chargingHours / connectedHours) : null,
+    avgKw,
+    peakKw
+  };
 }
 
 function median(values) {

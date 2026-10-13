@@ -21,6 +21,8 @@ import {
   IconButton,
   Banner,
   Badge,
+  PersonBadge,
+  SplitLegend,
   Sheet,
   ConfirmSheet,
   NumberField,
@@ -65,11 +67,17 @@ function duration(seconds) {
 
 const kw = (n) => `${formatNumber(n, 1)} kW`;
 
-// "4 h 12 min · Ø 3,6 / max. 3,7 kW" – kurz genug für schmale Handys
+// "3 h 36 min geladen (32 %) · Ø 10,9 / max. 11,5 kW" – Prozent = Anteil der Ladezeit an der Ansteckzeit
 function statsLine(session) {
   const { avgKw, peakKw } = sessionStats(session);
   const power = avgKw && peakKw ? `Ø ${formatNumber(avgKw, 1)} / max. ${kw(peakKw)}` : peakKw ? `max. ${kw(peakKw)}` : avgKw ? `Ø ${kw(avgKw)}` : null;
-  return [duration(session.chargedSeconds), power].filter(Boolean).join(' · ');
+  const { chargingShare } = sessionStats(session);
+  const time = duration(session.chargedSeconds);
+  return [time ? `${time} geladen${chargingShare !== null && chargingShare < 0.95 ? ` (${Math.round(chargingShare * 100)} %)` : ''}` : null, power].filter(Boolean).join(' · ');
+}
+
+function SuggestBadge({ person }) {
+  return person ? <PersonBadge index={person.colorIndex}>{person.name}?</PersonBadge> : null;
 }
 
 function Dot({ person }) {
@@ -114,7 +122,7 @@ function AssignList({ persons, value, card, onChange, suggestedKey }) {
             <span className="block truncate text-body text-ink">{o.label}</span>
             {o.hint && <span className="block truncate text-caption text-muted">{o.hint}</span>}
           </span>
-          {o.suggested && <Badge tone="primary">Vorschlag</Badge>}
+          {o.suggested && <PersonBadge index={o.person.colorIndex}>Vorschlag</PersonBadge>}
           {value !== null && (value || '') === o.key && <CheckIcon className="h-5 w-5 text-primary" aria-hidden="true" />}
         </button>
       ))}
@@ -122,36 +130,52 @@ function AssignList({ persons, value, card, onChange, suggestedKey }) {
   );
 }
 
+// Dauer in Stunden als Text, z. B. "3 h 36 min"
+const hoursText = (h) => (h === null || h === undefined ? '–' : duration(Math.round(h * 3600)));
+
 function SessionSheet({ session, persons, owners, price, onClose, readOnly, suggestion, powers }) {
   const toast = useToast();
   if (!session) return null;
   const ownerKey = ownerOf(session, persons, owners);
   const owner = persons.find((p) => p.key === ownerKey);
   const suggested = suggestion ? persons.find((p) => p.key === suggestion.key) : null;
-  const { avgKw, peakKw } = sessionStats(session);
+  const stats = sessionStats(session);
   const endsOtherDay = new Date(session.end).toDateString() !== new Date(session.start).toDateString();
   const assign = (key) => {
     store.setSessionOwners([session.id], key);
     toast('Zuordnung gespeichert');
     onClose();
   };
+  // Titel = Beginn (Anstecken) des Ladevorgangs
   return (
-    <Sheet open onClose={onClose} title={`${weekday(session.start)}, ${time(session.start)}`}>
-      <div className="grid grid-cols-2 gap-4">
+    <Sheet open onClose={onClose} title={`${weekday(session.start)}, ${time(session.start)} Uhr`}>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-5">
         <Stat label="Energie" value={formatKwh(session.kwh, true)} hint={`≈ ${formatEuro(session.kwh * price)}`} />
-        <Stat
-          label="Strom floss"
-          value={duration(session.chargedSeconds) || '–'}
-          hint={`${time(session.start)} – ${time(session.end)}${endsOtherDay ? ` (${formatDate(new Date(session.end).toISOString())})` : ''}`}
-        />
-        <Stat label="Ø Leistung" value={avgKw ? kw(avgKw) : '–'} hint="Energie ÷ Ladezeit" />
+        <Stat label="Karte" value={session.card || 'Ohne Karte'} hint={owner ? `gehört zu ${owner.name}` : 'noch niemandem zugeordnet'} />
+        <Stat label="Ø Leistung" value={stats.avgKw ? kw(stats.avgKw) : '–'} hint="über die reine Ladezeit" />
         <Stat
           label="Spitzenleistung"
-          value={peakKw ? kw(peakKw) : '–'}
-          hint={peakKw ? (peakKw < 4.5 ? 'typisch einphasig' : peakKw > 6.5 ? 'typisch dreiphasig' : undefined) : undefined}
+          value={stats.peakKw ? kw(stats.peakKw) : '–'}
+          hint={stats.peakKw ? (stats.peakKw < 4.5 ? 'typisch einphasig' : stats.peakKw > 6.5 ? 'typisch dreiphasig' : 'zwischen ein- und dreiphasig') : undefined}
         />
-        <Stat label="Karte" value={session.card || 'Ohne Karte'} />
       </div>
+
+      <Card className="mt-5 bg-surface-2 shadow-none">
+        <div className="mb-3 text-caption text-muted">
+          Angesteckt {time(session.start)} – {time(session.end)} Uhr{endsOtherDay ? ` (${formatDate(new Date(session.end).toISOString())})` : ''} ·{' '}
+          {hoursText(stats.connectedHours)}
+        </div>
+        {stats.chargingHours !== null ? (
+          <SplitLegend
+            parts={[
+              { label: 'Geladen', value: stats.chargingHours, text: hoursText(stats.chargingHours), className: 'bg-success' },
+              { label: 'Standzeit', value: stats.idleHours, text: hoursText(stats.idleHours), className: 'bg-subtle' }
+            ]}
+          />
+        ) : (
+          <p className="text-body text-muted">go-e liefert für diesen Ladevorgang keine reine Ladezeit.</p>
+        )}
+      </Card>
 
       {!readOnly && !owner && suggested && (
         <div className="mt-5">
@@ -166,7 +190,7 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
             }
           >
             {suggested.name} lädt typischerweise mit {kw(suggestion.kw)}
-            {powers.get(suggested.key) && powers.get(suggested.key).learned ? ' (gelernt aus bisherigen Ladevorgängen)' : ''}, dieser Ladevorgang mit {kw(peakKw)}.
+            {powers.get(suggested.key) && powers.get(suggested.key).learned ? ' (gelernt aus bisherigen Ladevorgängen)' : ''}, dieser Ladevorgang mit {kw(stats.peakKw)}.
           </Banner>
         </div>
       )}
@@ -183,7 +207,9 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
   );
 }
 
-function SessionsView({ onlyOpen, setOnlyOpen }) {
+// filter: 'all' (ohne Person: alle; mit Person: ihre + offene), 'mine' (nur die Person), 'open' (nur offene)
+function SessionsView({ filter, setFilter }) {
+  const onlyOpen = filter === 'open';
   const toast = useToast();
   const { demo } = useStatus();
   const history = useHistory();
@@ -207,7 +233,12 @@ function SessionsView({ onlyOpen, setOnlyOpen }) {
   const { suggestions, powers } = useMemo(() => suggestAll(history.sessions, persons, owners), [history.sessions, persons, owners]);
   const [confirmAll, setConfirmAll] = useState(false);
   const openCount = withOwner.filter((s) => s.owner === UNASSIGNED).length;
-  const visible = withOwner.filter((s) => (onlyOpen ? s.owner === UNASSIGNED : true) && (person && !onlyOpen ? s.owner === person.key : true));
+  const visible = withOwner.filter((s) => {
+    if (onlyOpen) return s.owner === UNASSIGNED;
+    if (!person) return true;
+    if (filter === 'mine') return s.owner === person.key;
+    return s.owner === person.key || s.owner === UNASSIGNED;
+  });
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -269,21 +300,23 @@ function SessionsView({ onlyOpen, setOnlyOpen }) {
         <div className="flex-1">
           <Segmented
             label="Filter"
-            value={onlyOpen ? 'open' : 'all'}
-            onChange={(v) => setOnlyOpen(v === 'open')}
+            value={person || filter !== 'mine' ? filter : 'all'}
+            onChange={setFilter}
             options={[
-              { value: 'all', label: person ? person.name : 'Alle' },
-              {
-                value: 'open',
-                label: `Offen${openCount ? ` (${openCount})` : ''}`
-              }
+              ...(person
+                ? [
+                    { value: 'all', label: `${person.name} & offen` },
+                    { value: 'mine', label: person.name }
+                  ]
+                : [{ value: 'all', label: 'Alle' }]),
+              { value: 'open', label: `Offen${openCount ? ` (${openCount})` : ''}` }
             ]}
           />
         </div>
         <IconButton icon={ArrowPathIcon} label="Ladeverlauf aktualisieren" onClick={() => history.sync(true)} spinning={history.loading} />
       </div>
 
-      {onlyOpen && !demo && suggestions.size > 0 && (
+      {filter !== 'mine' && (onlyOpen || person) && !demo && suggestions.size > 0 && (
         <Banner
           tone="primary"
           icon={SparklesIcon}
@@ -366,11 +399,7 @@ function SessionsView({ onlyOpen, setOnlyOpen }) {
                         </span>
                         {!owner &&
                           !selecting &&
-                          (suggestions.has(s.id) ? (
-                            <Badge tone="primary">{(persons.find((p) => p.key === suggestions.get(s.id).key) || {}).name}?</Badge>
-                          ) : (
-                            <Badge tone="warning">offen</Badge>
-                          ))}
+                          (suggestions.has(s.id) ? <SuggestBadge person={persons.find((p) => p.key === suggestions.get(s.id).key)} /> : <Badge tone="warning">offen</Badge>)}
                       </span>
                       {owner && (
                         <span className="block truncate text-caption text-muted">
@@ -763,7 +792,10 @@ export default function HistoryPage() {
       {view === 'abrechnungen' ? (
         <PeriodsView />
       ) : active ? (
-        <SessionsView onlyOpen={view === 'offen'} setOnlyOpen={(open) => setView(open ? 'offen' : 'ladungen')} />
+        <SessionsView
+          filter={view === 'offen' ? 'open' : view === 'meine' ? 'mine' : 'all'}
+          setFilter={(f) => setView(f === 'open' ? 'offen' : f === 'mine' ? 'meine' : 'ladungen')}
+        />
       ) : (
         <EmptyState icon={ClockIcon} title="Noch keine Wallbox verbunden" action={<Button to="/einstellungen/wallbox">Wallbox verbinden</Button>} />
       )}

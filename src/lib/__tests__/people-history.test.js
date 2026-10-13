@@ -152,7 +152,9 @@ describe('Vorschläge nach Ladeleistung', () => {
   const history = [mk('b1', 11, 'Karte B'), mk('b2', 10.8, 'Karte B'), mk('b3', 11.1, 'Karte B'), mk('x1', 3.6), mk('x2', 10.9), mk('x3', 7.2), mk('x4', null)];
 
   it('Kennzahlen', () => {
-    expect(sessionStats(mk('s', 3.7, null, 9))).toEqual({ hours: 3, avgKw: 3, peakKw: 3.7 });
+    // 4 h angesteckt, 3 h geladen → 1 h Standzeit, Ø nur über die Ladezeit
+    expect(sessionStats(mk('s', 3.7, null, 9))).toEqual({ connectedHours: 4, chargingHours: 3, idleHours: 1, chargingShare: 0.75, avgKw: 3, peakKw: 3.7 });
+    expect(sessionStats({ ...mk('s', 3.7, null, 9), chargedSeconds: null }).avgKw).toBeNull();
   });
 
   it('Leistung aus Profil oder gelernt (Median, ab 3 Ladevorgängen)', () => {

@@ -55,7 +55,9 @@ Auf dem iPhone haben Safari und die installierte App **getrennte** Speicher.
 
 ## Vorschläge (`src/lib/suggest.js`)
 
-- Kennzahlen pro Ladevorgang: Dauer mit Stromfluss, Ø-Leistung (kWh ÷ Ladezeit), Spitzenleistung (`max_power`).
+- Kennzahlen pro Ladevorgang (`sessionStats`): angesteckt = Ende − Beginn; geladen = go-e `seconds_charged`;
+  Standzeit = angesteckt − geladen (in Stunden und % der Ansteckzeit); Ø-Leistung = kWh ÷ **reine Ladezeit**
+  (ohne Ladezeit von go-e: keine Ø-Leistung); Spitzenleistung = `max_power`.
 - Typische Leistung je Person: `chargeKw` aus dem Profil, sonst Median der Spitzenleistung ihrer Ladevorgänge (ab 3 Stück, nur ≥ 1 kWh).
 - Vorschlag nur, wenn genau eine Person passt: Abweichung ≤ 25 % und die zweitbeste mindestens 15 Prozentpunkte schlechter.
   Vorschläge werden nie automatisch gespeichert – erst beim Tippen auf „zuordnen“ bzw. „Alle übernehmen“.

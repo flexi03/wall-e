@@ -58,7 +58,11 @@ export function Card({ children, className, padded = true, as: Tag = 'div', ...p
 // ---------- Listen (gruppiert, wie in iOS-Einstellungen) ----------
 
 export function List({ children, className }) {
-  return <Card padded={false} className={cx('divide-y divide-line overflow-hidden', className)}>{children}</Card>;
+  return (
+    <Card padded={false} className={cx('divide-y divide-line overflow-hidden', className)}>
+      {children}
+    </Card>
+  );
 }
 
 export function ListItem({ icon: Icon, iconTone = 'primary', title, subtitle, value, to, href, onClick, chevron, danger, children }) {
@@ -80,9 +84,24 @@ export function ListItem({ icon: Icon, iconTone = 'primary', title, subtitle, va
   );
   const base = 'flex min-h-[3.25rem] w-full items-center gap-3 px-4 py-2.5 text-left';
   const interactive = 'transition-colors hover:bg-surface-2 active:bg-surface-2';
-  if (to) return <Link to={to} className={cx(base, interactive)}>{content}</Link>;
-  if (href) return <a href={href} target="_blank" rel="noopener noreferrer" className={cx(base, interactive)}>{content}</a>;
-  if (onClick) return <button type="button" onClick={onClick} className={cx(base, interactive)}>{content}</button>;
+  if (to)
+    return (
+      <Link to={to} className={cx(base, interactive)}>
+        {content}
+      </Link>
+    );
+  if (href)
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cx(base, interactive)}>
+        {content}
+      </a>
+    );
+  if (onClick)
+    return (
+      <button type="button" onClick={onClick} className={cx(base, interactive)}>
+        {content}
+      </button>
+    );
   return <div className={base}>{content}</div>;
 }
 
@@ -116,7 +135,12 @@ export function Button({ variant = 'primary', size = 'md', block, icon: Icon, lo
       {children}
     </>
   );
-  if (to) return <Link to={to} className={classes}>{inner}</Link>;
+  if (to)
+    return (
+      <Link to={to} className={classes}>
+        {inner}
+      </Link>
+    );
   return (
     <button type="button" className={classes} disabled={disabled || loading} {...props}>
       {inner}
@@ -182,8 +206,8 @@ export function Stat({ label, value, hint, tone }) {
   return (
     <div className="min-w-0">
       <div className="text-caption text-muted">{label}</div>
-      <div className={cx('tabular mt-0.5 truncate text-headline', tone ? TONES_TEXT[tone] : 'text-ink')}>{value}</div>
-      {hint && <div className="mt-0.5 truncate text-caption text-muted">{hint}</div>}
+      <div className={cx('tabular mt-0.5 break-words text-headline', tone ? TONES_TEXT[tone] : 'text-ink')}>{value}</div>
+      {hint && <div className="mt-0.5 break-words text-caption text-muted">{hint}</div>}
     </div>
   );
 }
@@ -221,6 +245,49 @@ export const personColor = (index) => `rgb(var(--person-${(index % 6) + 1}))`;
 
 export function PersonDot({ index, className = 'h-2.5 w-2.5' }) {
   return <span className={cx('inline-block shrink-0 rounded-full', className)} style={{ backgroundColor: personColor(index) }} aria-hidden="true" />;
+}
+
+// Kleines Etikett in der Farbe einer Person (z. B. Zuordnungs-Vorschlag)
+export function PersonBadge({ index, children }) {
+  const color = `var(--person-${(index % 6) + 1})`;
+  return (
+    <span
+      className="inline-flex max-w-full shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-caption font-semibold"
+      style={{ color: `rgb(${color})`, backgroundColor: `rgb(${color} / 0.16)` }}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+// Zwei Anteile als Balken mit Legende, z. B. Laden vs. Stehen
+export function SplitLegend({ parts }) {
+  const total = parts.reduce((sum, p) => sum + p.value, 0);
+  return (
+    <div>
+      <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
+        {total > 0 &&
+          parts.map((p) =>
+            p.value > 0 ? (
+              <span key={p.label} className={cx('h-full first:rounded-l-full last:rounded-r-full', p.className)} style={{ width: `${(p.value / total) * 100}%` }} />
+            ) : null
+          )}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-4">
+        {parts.map((p) => (
+          <div key={p.label} className="min-w-0">
+            <div className="flex items-center gap-1.5 text-caption text-muted">
+              <span className={cx('h-2.5 w-2.5 shrink-0 rounded-full', p.className)} aria-hidden="true" />
+              {p.label}
+            </div>
+            <div className="tabular mt-0.5 break-words text-headline text-ink">{p.text}</div>
+            <div className="tabular text-caption text-muted">{total > 0 ? `${Math.round((p.value / total) * 100)} %` : '–'}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // Balken mit den Anteilen aller Personen. colors[i] = Farbindex der Person, null = grau (nicht zugeordnet).
@@ -270,12 +337,7 @@ export function TextField({ label, hint, error, unit, className, multiline, ...p
   return (
     <Field label={label} hint={hint} error={error} id={id}>
       <div className="relative">
-        <Tag
-          id={id}
-          className={cx(inputClasses, multiline && 'py-3', unit && 'pr-16', error && 'border-danger', className)}
-          rows={multiline ? 3 : undefined}
-          {...props}
-        />
+        <Tag id={id} className={cx(inputClasses, multiline && 'py-3', unit && 'pr-16', error && 'border-danger', className)} rows={multiline ? 3 : undefined} {...props} />
         {unit && <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-body text-muted">{unit}</span>}
       </div>
     </Field>
@@ -298,12 +360,12 @@ export function Segmented({ options, value, onChange, label }) {
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cx(
-            'flex min-h-10 items-center justify-center gap-1.5 rounded-[0.625rem] px-3 text-caption font-semibold transition-colors',
+            'flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-[0.625rem] px-2 text-caption font-semibold transition-colors',
             value === o.value ? 'bg-surface text-ink shadow-card' : 'text-muted hover:text-ink'
           )}
         >
-          {o.icon && <o.icon className="h-4 w-4" aria-hidden="true" />}
-          {o.label}
+          {o.icon && <o.icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+          <span className="truncate">{o.label}</span>
         </button>
       ))}
     </div>
@@ -434,7 +496,10 @@ export function ToastProvider({ children }) {
       {children}
       <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[60] flex justify-center px-4 lg:bottom-8" aria-live="polite">
         {toast && (
-          <div key={toast.key} className={cx('animate-pop-in rounded-full px-4 py-2.5 text-body font-semibold shadow-sheet', toast.tone === 'danger' ? 'bg-danger text-white' : 'bg-ink text-bg')}>
+          <div
+            key={toast.key}
+            className={cx('animate-pop-in rounded-full px-4 py-2.5 text-body font-semibold shadow-sheet', toast.tone === 'danger' ? 'bg-danger text-white' : 'bg-ink text-bg')}
+          >
             {toast.message}
           </div>
         )}
