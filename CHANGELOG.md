@@ -17,7 +17,7 @@ Komplett neu gestaltet – mobil zuerst. Alle Daten aus Version 1 bleiben erhalt
 - Abrechnung nach Ladevorgängen; Ladungen ohne Zuordnung als eigene Zeile oder anteilig verteilt (umschaltbar). Ohne Ladeverlauf wie bisher über die Kartenstände.
 - Ladevorgänge zeigen Dauer, Ø- und Spitzenleistung. Profile können die Ladeleistung des Autos angeben (sonst gelernt); Ladungen ohne Karte bekommen einen Zuordnungs-Vorschlag, einzeln oder alle auf einmal übernehmbar.
 - Ladevorgang im Detail: Beginn als Titel, Balken „Geladen / Standzeit“ in Stunden und Prozent, Ø-Leistung nur über die reine Ladezeit; Texte werden nie abgeschnitten.
-- Vorschläge in der Farbe der jeweiligen Person. Mit gewählter Person zeigt der Verlauf ihre und die offenen Ladevorgänge; ein Chip „Offen“ zeigt nur die offenen.
+- Vorschläge in der Farbe der jeweiligen Person. Verlauf ohne Filter-Schalter: alle Monate, mit gewählter Person ihre und die offenen Ladevorgänge; offene stehen oben gesammelt mit „Übernehmen“.
 - Stabilere Verbindung: kurze Fehler der go-e Cloud (z. B. „Fehler 500“) werden still wiederholt, der letzte Stand bleibt sichtbar.
 - Willkommens-Bildschirm beim ersten Start mit automatischer Sicherung des bisherigen Stands (wiederherstellbar) und Sicherungsdatei.
 - Komma in Zahlenfeldern, deutsche Zahlenformate, keine Browser-Popups mehr.

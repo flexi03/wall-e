@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   ClockIcon,
   PencilSquareIcon,
@@ -15,7 +15,6 @@ import {
   Page,
   Section,
   Card,
-  Chip,
   List,
   ListItem,
   Button,
@@ -208,9 +207,8 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
   );
 }
 
-// filter: 'all' (ohne Person: alle; mit Person: ihre + offene) oder 'open' (nur offene)
-function SessionsView({ filter, setFilter }) {
-  const onlyOpen = filter === 'open';
+// Ohne gewählte Person: alle Ladevorgänge. Mit Person: ihre und die offenen (zum Zuordnen).
+function SessionsView() {
   const toast = useToast();
   const { demo } = useStatus();
   const history = useHistory();
@@ -221,7 +219,6 @@ function SessionsView({ filter, setFilter }) {
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState([]);
   const [assignOpen, setAssignOpen] = useState(false);
-  const [months, setMonths] = useState(3);
 
   const withOwner = useMemo(
     () =>
@@ -234,11 +231,7 @@ function SessionsView({ filter, setFilter }) {
   const { suggestions, powers } = useMemo(() => suggestAll(history.sessions, persons, owners), [history.sessions, persons, owners]);
   const [confirmAll, setConfirmAll] = useState(false);
   const openCount = withOwner.filter((s) => s.owner === UNASSIGNED).length;
-  const visible = withOwner.filter((s) => {
-    if (onlyOpen) return s.owner === UNASSIGNED;
-    if (!person) return true;
-    return s.owner === person.key || s.owner === UNASSIGNED;
-  });
+  const visible = person ? withOwner.filter((s) => s.owner === person.key || s.owner === UNASSIGNED) : withOwner;
 
   const groups = useMemo(() => {
     const map = new Map();
@@ -296,47 +289,41 @@ function SessionsView({ filter, setFilter }) {
           {history.error} Angezeigt wird der zuletzt geladene Stand.
         </Banner>
       )}
-      {/* Eine Zeile: was gerade zu sehen ist, Filter "Offen" als Chip, Aktualisieren */}
-      <div className="flex items-center gap-2">
-        <p className="min-w-0 flex-1 truncate px-1 text-caption text-muted">{onlyOpen ? 'Nur offene' : person ? `${person.name} + offene` : 'Alle'}</p>
-        {openCount > 0 && (
-          <Chip pressed={onlyOpen} onClick={() => setFilter(onlyOpen ? 'all' : 'open')} tone="warning">
-            Offen {openCount}
-          </Chip>
-        )}
-        <IconButton icon={ArrowPathIcon} label="Ladeverlauf aktualisieren" onClick={() => history.sync(true)} spinning={history.loading} />
-      </div>
-
-      {/* Vorschläge: kompakt, nur wenn es etwas zu tun gibt */}
-      {!demo && suggestions.size > 0 && (onlyOpen || person) && (
+      {/* Offene Ladevorgänge: eine Karte, nur wenn es welche gibt */}
+      {openCount > 0 && (
         <Card padded={false}>
           <div className="flex items-center gap-3 px-4 py-3">
-            <SparklesIcon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-            <p className="min-w-0 flex-1 text-body text-ink">
-              {suggestions.size} Vorschl{suggestions.size === 1 ? 'ag' : 'äge'} nach Ladeleistung
-            </p>
-            <Button size="sm" onClick={() => setConfirmAll(true)}>
-              Übernehmen
-            </Button>
+            <span className="h-3 w-3 shrink-0 rounded-full border-2 border-dashed border-warning" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-body font-semibold text-ink">{openCount} ohne Zuordnung</p>
+              <p className="text-caption text-muted">
+                {suggestions.size > 0
+                  ? `${suggestions.size} Vorschl${suggestions.size === 1 ? 'ag' : 'äge'} nach Ladeleistung`
+                  : powers.size === 0
+                    ? 'Ladeleistung unter Personen eintragen, dann schlägt Wall-E vor'
+                    : 'Tippe einen Ladevorgang an, um ihn zuzuordnen'}
+              </p>
+            </div>
+            {!demo && suggestions.size > 0 && (
+              <Button size="sm" onClick={() => setConfirmAll(true)}>
+                Übernehmen
+              </Button>
+            )}
+            {!demo && suggestions.size === 0 && powers.size === 0 && (
+              <Button size="sm" variant="plain" to="/einstellungen/personen">
+                Personen
+              </Button>
+            )}
           </div>
         </Card>
-      )}
-      {!demo && onlyOpen && suggestions.size === 0 && powers.size === 0 && (
-        <p className="px-1 text-caption text-muted">
-          Tipp: Trag unter{' '}
-          <Link to="/einstellungen/personen" className="font-semibold text-primary">
-            Personen
-          </Link>{' '}
-          die Ladeleistung der Autos ein (z. B. 3,7 oder 11 kW), dann schlägt Wall-E die passende Person vor.
-        </p>
       )}
 
       {visible.length === 0 ? (
         <Card>
-          <p className="py-4 text-center text-body text-muted">{onlyOpen ? 'Alle Ladevorgänge sind zugeordnet.' : 'Keine Ladevorgänge für diese Auswahl.'}</p>
+          <p className="py-4 text-center text-body text-muted">Keine Ladevorgänge für diese Auswahl.</p>
         </Card>
       ) : (
-        groups.slice(0, months).map(([label, list], index) => (
+        groups.map(([label, list], index) => (
           <Section
             key={label}
             title={`${label} · ${formatKwh(list.reduce((sum, s) => sum + s.kwh, 0))}`}
@@ -402,11 +389,6 @@ function SessionsView({ filter, setFilter }) {
             </List>
           </Section>
         ))
-      )}
-      {groups.length > months && (
-        <Button variant="ghost" block onClick={() => setMonths((m) => m + 6)}>
-          Ältere anzeigen
-        </Button>
       )}
       <p className="px-1 text-center text-caption text-subtle">
         {history.sessions.length} Ladevorgänge aus dem go-e Ladeverlauf
@@ -760,11 +742,19 @@ export default function HistoryPage() {
   const { active, demo } = useStatus();
   const history = useHistory();
   const [params, setParams] = useSearchParams();
-  const view = params.get('ansicht') || (history.available || history.link ? 'ladungen' : 'abrechnungen');
+  const view = params.get('ansicht') === 'abrechnungen' ? 'abrechnungen' : history.available || history.link ? 'ladungen' : 'abrechnungen';
   const setView = (v) => setParams(v === 'ladungen' ? {} : { ansicht: v }, { replace: true });
 
   return (
-    <Page title="Verlauf" action={<PersonPicker />}>
+    <Page
+      title="Verlauf"
+      action={
+        <>
+          <PersonPicker />
+          {view === 'ladungen' && active && <IconButton icon={ArrowPathIcon} label="Ladeverlauf aktualisieren" onClick={() => history.sync(true)} spinning={history.loading} />}
+        </>
+      }
+    >
       {demo && <DemoBanner />}
       <Segmented
         label="Ansicht"
@@ -778,10 +768,7 @@ export default function HistoryPage() {
       {view === 'abrechnungen' ? (
         <PeriodsView />
       ) : active ? (
-        <SessionsView
-          filter={view === 'offen' ? 'open' : view === 'meine' ? 'mine' : 'all'}
-          setFilter={(f) => setView(f === 'open' ? 'offen' : f === 'mine' ? 'meine' : 'ladungen')}
-        />
+        <SessionsView />
       ) : (
         <EmptyState icon={ClockIcon} title="Noch keine Wallbox verbunden" action={<Button to="/einstellungen/wallbox">Wallbox verbinden</Button>} />
       )}
