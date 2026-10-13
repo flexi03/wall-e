@@ -74,7 +74,8 @@ npm run build             # nach dist/ – dist/ und server/ zusammen auf einen 
 
 ## Testen (vor jedem Deploy)
 
-1. `npm test` – alles grün (Abrechnung = V1, Ladevorgänge/Personen/Vorschläge, Datenschicht, Teilen, Sicherung).
+1. `npm test` – alles grün (Abrechnung = V1, V1-Kompatibilität in `v1-compat.test.js`, Ladevorgänge/Personen/
+   Vorschläge, Datenschicht, Teilen, Sicherung).
 2. `npm run dev`, im Browser die Konsole öffnen und V1-Daten einspielen (`v1Storage` in
    `src/lib/__tests__/fixtures.js`). Die go-e-Antwort lässt sich durch Überschreiben von `window.fetch`
    simulieren (`/api/status.php` mit `dll`, `/api/history.php` mit `{ data: [...] }` im go-e-Format,

@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 (in Arbeit)
+## 2.0.0 (13.10.2026)
 
 Komplett neu gestaltet – mobil zuerst. Alle Daten aus Version 1 bleiben erhalten, die App muss nicht neu installiert werden.
 

@@ -1,6 +1,6 @@
 {
   "name": "wall-e",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0",
   "private": true,
   "description": "Wall-E – go-e Wallbox Tracker: Live-Status, Ladevorgänge und faire Kostenaufteilung",
   "type": "module",
