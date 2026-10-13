@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid';
 import {
   ClockIcon,
   PencilSquareIcon,
@@ -133,22 +134,12 @@ function AssignList({ persons, value, card, onChange, suggestedKey }) {
 // Dauer in Stunden als Text, z. B. "3 h 36 min"
 const hoursText = (h) => (h === null || h === undefined ? '–' : duration(Math.round(h * 3600)));
 
-function SessionSheet({ session, persons, owners, price, onClose, readOnly, suggestion, powers }) {
-  const toast = useToast();
-  if (!session) return null;
-  const ownerKey = ownerOf(session, persons, owners);
-  const owner = persons.find((p) => p.key === ownerKey);
-  const suggested = suggestion ? persons.find((p) => p.key === suggestion.key) : null;
+// Kennzahlen eines Ladevorgangs: Energie, Karte, Leistung, Ansteckzeit mit Geladen/Standzeit
+function SessionDetail({ session, owner, price }) {
   const stats = sessionStats(session);
   const endsOtherDay = new Date(session.end).toDateString() !== new Date(session.start).toDateString();
-  const assign = (key) => {
-    store.setSessionOwners([session.id], key);
-    toast('Zuordnung gespeichert');
-    onClose();
-  };
-  // Titel = Beginn (Anstecken) des Ladevorgangs
   return (
-    <Sheet open onClose={onClose} title={`${weekday(session.start)}, ${time(session.start)} Uhr`}>
+    <>
       <div className="grid grid-cols-2 gap-x-4 gap-y-5">
         <Stat label="Energie" value={formatKwh(session.kwh, true)} hint={`≈ ${formatEuro(session.kwh * price)}`} />
         <Stat label="Karte" value={session.card || 'Ohne Karte'} hint={owner ? `gehört zu ${owner.name}` : 'noch niemandem zugeordnet'} />
@@ -176,6 +167,26 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
           <p className="text-body text-muted">go-e liefert für diesen Ladevorgang keine reine Ladezeit.</p>
         )}
       </Card>
+    </>
+  );
+}
+
+function SessionSheet({ session, persons, owners, price, onClose, readOnly, suggestion, powers }) {
+  const toast = useToast();
+  if (!session) return null;
+  const ownerKey = ownerOf(session, persons, owners);
+  const owner = persons.find((p) => p.key === ownerKey);
+  const suggested = suggestion ? persons.find((p) => p.key === suggestion.key) : null;
+  const stats = sessionStats(session);
+  const assign = (key) => {
+    store.setSessionOwners([session.id], key);
+    toast('Zuordnung gespeichert');
+    onClose();
+  };
+  // Titel = Beginn (Anstecken) des Ladevorgangs
+  return (
+    <Sheet open onClose={onClose} title={`${weekday(session.start)}, ${time(session.start)} Uhr`}>
+      <SessionDetail session={session} owner={owner} price={price} />
 
       {!readOnly && !owner && suggested && (
         <div className="mt-5">
@@ -210,8 +221,13 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
 // Vorschläge übernehmen: erst auswählen (alle oder eine Person), dann mit kurzer Liste bestätigen
 function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons, initialScope, onDone }) {
   const [scope, setScope] = useState(initialScope);
+  const [detailId, setDetailId] = useState(null);
+  const price = useStored(store.getPrice);
   useEffect(() => {
-    if (open) setScope(initialScope);
+    if (open) {
+      setScope(initialScope);
+      setDetailId(null);
+    }
   }, [open, initialScope]);
 
   const counts = new Map();
@@ -234,60 +250,95 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
     onClose();
   };
 
+  // Beim Wechsel zwischen Liste und Detail oben beginnen
+  useEffect(() => {
+    const scroller = document.querySelector('[role="dialog"] .overflow-y-auto');
+    if (scroller) scroller.scrollTop = 0;
+  }, [detailId]);
+
+  const detail = detailId ? chosen.find((s) => s.id === detailId) || sessions.find((s) => s.id === detailId) : null;
+  const detailTarget = detail && suggestions.get(detail.id) ? persons.find((p) => p.key === suggestions.get(detail.id).key) : null;
+
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title="Vorschläge übernehmen"
+      title={detail ? `${weekday(detail.start)}, ${time(detail.start)} Uhr` : 'Vorschläge übernehmen'}
       footer={
-        <Button block size="lg" disabled={chosen.length === 0} onClick={accept}>
-          {chosen.length} Ladevorg{chosen.length === 1 ? 'ang' : 'änge'} zuordnen
-        </Button>
+        detail ? (
+          <Button block size="lg" variant="plain" icon={ChevronLeftIcon} onClick={() => setDetailId(null)}>
+            Zurück zur Liste
+          </Button>
+        ) : (
+          <Button block size="lg" disabled={chosen.length === 0} onClick={accept}>
+            {chosen.length} Ladevorg{chosen.length === 1 ? 'ang' : 'änge'} zuordnen
+          </Button>
+        )
       }
     >
-      <h3 className="mb-2 text-caption font-semibold text-muted">Welche?</h3>
-      <div className="-mx-5 divide-y divide-line border-y border-line">
-        {scopes.map((x) => (
-          <button
-            key={x.key}
-            type="button"
-            onClick={() => setScope(x.key)}
-            className="flex min-h-[3.25rem] w-full items-center gap-3 px-5 text-left hover:bg-surface-2"
-            aria-pressed={active === x.key}
-          >
-            {x.person ? <PersonDot index={x.person.colorIndex} className="h-3 w-3" /> : <SparklesIcon className="h-4 w-4 text-primary" aria-hidden="true" />}
-            <span className="min-w-0 flex-1 text-body text-ink">{x.label}</span>
-            <span className="tabular text-body text-muted">{x.count}</span>
-            <span
-              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${active === x.key ? 'border-primary bg-primary text-primary-on' : 'border-line'}`}
-              aria-hidden="true"
-            >
-              {active === x.key && <CheckIcon className="h-3 w-3" />}
-            </span>
-          </button>
-        ))}
-      </div>
+      {detail ? (
+        <>
+          <SessionDetail session={detail} owner={null} price={price.value} />
+          {detailTarget && (
+            <p className="mt-5 flex flex-wrap items-center gap-2 text-body text-muted">
+              Vorschlag: <PersonBadge index={detailTarget.colorIndex}>{detailTarget.name}</PersonBadge>
+              <span>(typisch {kw(suggestions.get(detail.id).kw)})</span>
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <h3 className="mb-2 text-caption font-semibold text-muted">Welche?</h3>
+          <div className="-mx-5 divide-y divide-line border-y border-line">
+            {scopes.map((x) => (
+              <button
+                key={x.key}
+                type="button"
+                onClick={() => setScope(x.key)}
+                className="flex min-h-[3.25rem] w-full items-center gap-3 px-5 text-left hover:bg-surface-2"
+                aria-pressed={active === x.key}
+              >
+                {x.person ? <PersonDot index={x.person.colorIndex} className="h-3 w-3" /> : <SparklesIcon className="h-4 w-4 text-primary" aria-hidden="true" />}
+                <span className="min-w-0 flex-1 text-body text-ink">{x.label}</span>
+                <span className="tabular text-body text-muted">{x.count}</span>
+                <span
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${active === x.key ? 'border-primary bg-primary text-primary-on' : 'border-line'}`}
+                  aria-hidden="true"
+                >
+                  {active === x.key && <CheckIcon className="h-3 w-3" />}
+                </span>
+              </button>
+            ))}
+          </div>
 
-      <h3 className="mb-2 mt-5 text-caption font-semibold text-muted">Wird zugeordnet</h3>
-      <Card padded={false} className="divide-y divide-line bg-surface-2 shadow-none">
-        {chosen.map((s) => {
-          const target = persons.find((p) => p.key === suggestions.get(s.id).key);
-          return (
-            <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="min-w-0 flex-1">
-                <span className="block text-body text-ink">
-                  {weekday(s.start)} · {time(s.start)}
-                </span>
-                <span className="tabular block text-caption text-muted">
-                  {formatKwh(s.kwh)} · max. {kw(sessionStats(s).peakKw)}
-                </span>
-              </span>
-              {target && <PersonBadge index={target.colorIndex}>{target.name}</PersonBadge>}
-            </div>
-          );
-        })}
-      </Card>
-      <p className="mt-3 text-caption text-muted">Jede Zuordnung lässt sich später im Ladevorgang ändern.</p>
+          <h3 className="mb-2 mt-5 text-caption font-semibold text-muted">Wird zugeordnet · antippen für Details</h3>
+          <Card padded={false} className="divide-y divide-line bg-surface-2 shadow-none">
+            {chosen.map((s) => {
+              const target = persons.find((p) => p.key === suggestions.get(s.id).key);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setDetailId(s.id)}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-body text-ink">
+                      {weekday(s.start)} · {time(s.start)}
+                    </span>
+                    <span className="tabular block text-caption text-muted">
+                      {formatKwh(s.kwh)} · max. {kw(sessionStats(s).peakKw)}
+                    </span>
+                  </span>
+                  {target && <PersonBadge index={target.colorIndex}>{target.name}</PersonBadge>}
+                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-subtle" aria-hidden="true" />
+                </button>
+              );
+            })}
+          </Card>
+          <p className="mt-3 text-caption text-muted">Jede Zuordnung lässt sich später im Ladevorgang ändern.</p>
+        </>
+      )}
     </Sheet>
   );
 }
