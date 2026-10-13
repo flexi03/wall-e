@@ -207,6 +207,93 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
   );
 }
 
+// Vorschläge übernehmen: erst auswählen (alle oder eine Person), dann mit kurzer Liste bestätigen
+function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons, initialScope, onDone }) {
+  const [scope, setScope] = useState(initialScope);
+  useEffect(() => {
+    if (open) setScope(initialScope);
+  }, [open, initialScope]);
+
+  const counts = new Map();
+  suggestions.forEach((sug) => counts.set(sug.key, (counts.get(sug.key) || 0) + 1));
+  const scopes = [
+    { key: 'all', label: 'Alle Vorschläge', count: suggestions.size },
+    ...persons.filter((p) => counts.get(p.key)).map((p) => ({ key: p.key, label: p.name, person: p, count: counts.get(p.key) }))
+  ];
+  const active = scopes.some((x) => x.key === scope) ? scope : 'all';
+  const chosen = sessions.filter((s) => suggestions.has(s.id) && (active === 'all' || suggestions.get(s.id).key === active));
+  const PREVIEW = 6;
+
+  const accept = () => {
+    const byPerson = new Map();
+    chosen.forEach((s) => {
+      const key = suggestions.get(s.id).key;
+      byPerson.set(key, [...(byPerson.get(key) || []), s.id]);
+    });
+    byPerson.forEach((ids, key) => store.setSessionOwners(ids, key));
+    onDone(chosen.length);
+    onClose();
+  };
+
+  return (
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title="Vorschläge übernehmen"
+      footer={
+        <Button block size="lg" disabled={chosen.length === 0} onClick={accept}>
+          {chosen.length} Ladevorg{chosen.length === 1 ? 'ang' : 'änge'} zuordnen
+        </Button>
+      }
+    >
+      <h3 className="mb-2 text-caption font-semibold text-muted">Welche?</h3>
+      <div className="-mx-5 divide-y divide-line border-y border-line">
+        {scopes.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            onClick={() => setScope(x.key)}
+            className="flex min-h-[3.25rem] w-full items-center gap-3 px-5 text-left hover:bg-surface-2"
+            aria-pressed={active === x.key}
+          >
+            {x.person ? <PersonDot index={x.person.colorIndex} className="h-3 w-3" /> : <SparklesIcon className="h-4 w-4 text-primary" aria-hidden="true" />}
+            <span className="min-w-0 flex-1 text-body text-ink">{x.label}</span>
+            <span className="tabular text-body text-muted">{x.count}</span>
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${active === x.key ? 'border-primary bg-primary text-primary-on' : 'border-line'}`}
+              aria-hidden="true"
+            >
+              {active === x.key && <CheckIcon className="h-3 w-3" />}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <h3 className="mb-2 mt-5 text-caption font-semibold text-muted">Wird zugeordnet</h3>
+      <Card padded={false} className="divide-y divide-line bg-surface-2 shadow-none">
+        {chosen.slice(0, PREVIEW).map((s) => {
+          const target = persons.find((p) => p.key === suggestions.get(s.id).key);
+          return (
+            <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
+              <span className="min-w-0 flex-1">
+                <span className="block text-body text-ink">
+                  {weekday(s.start)} · {time(s.start)}
+                </span>
+                <span className="tabular block text-caption text-muted">
+                  {formatKwh(s.kwh)} · max. {kw(sessionStats(s).peakKw)}
+                </span>
+              </span>
+              {target && <PersonBadge index={target.colorIndex}>{target.name}</PersonBadge>}
+            </div>
+          );
+        })}
+        {chosen.length > PREVIEW && <p className="px-4 py-2.5 text-caption text-muted">… und {chosen.length - PREVIEW} weitere</p>}
+      </Card>
+      <p className="mt-3 text-caption text-muted">Jede Zuordnung lässt sich später im Ladevorgang ändern.</p>
+    </Sheet>
+  );
+}
+
 // Ohne gewählte Person: alle Ladevorgänge. Mit Person: ihre und die offenen (zum Zuordnen).
 function SessionsView() {
   const toast = useToast();
@@ -416,31 +503,15 @@ function SessionsView() {
           }}
         />
       </Sheet>
-      <ConfirmSheet
+      <AcceptSuggestionsSheet
         open={confirmAll}
         onClose={() => setConfirmAll(false)}
-        title="Alle Vorschläge übernehmen?"
-        confirmLabel="Übernehmen"
-        onConfirm={() => {
-          const byPerson = new Map();
-          suggestions.forEach((sug, id) => byPerson.set(sug.key, [...(byPerson.get(sug.key) || []), id]));
-          byPerson.forEach((ids, key) => store.setSessionOwners(ids, key));
-          toast(`${suggestions.size} Ladevorgänge zugeordnet`);
-        }}
-      >
-        <ul className="space-y-1.5">
-          {persons
-            .map((p) => ({ p, count: [...suggestions.values()].filter((sug) => sug.key === p.key).length }))
-            .filter((x) => x.count > 0)
-            .map(({ p, count }) => (
-              <li key={p.key} className="flex items-center gap-2 text-ink">
-                <PersonDot index={p.colorIndex} />
-                {p.name}: {count} Ladevorgang{count === 1 ? '' : 'e'}
-              </li>
-            ))}
-        </ul>
-        <p className="mt-3">Du kannst jede Zuordnung später im Ladevorgang ändern.</p>
-      </ConfirmSheet>
+        sessions={history.sessions}
+        suggestions={suggestions}
+        persons={persons}
+        initialScope={person ? person.key : 'all'}
+        onDone={(count) => toast(`${count} Ladevorg${count === 1 ? 'ang' : 'änge'} zugeordnet`)}
+      />
       <SessionSheet
         suggestion={session ? suggestions.get(session.id) : null}
         powers={powers}

@@ -73,7 +73,7 @@ Neue Muster zuerst hier ergänzen, dann benutzen – keine Einzel-Stile in Seite
 |---|---|
 | Live `/` | Status-Badge, Leistung (Hauptzahl), diese Ladung + Karte, laufende Abrechnung, Wallbox-Werte, RFID-Karten |
 | Abrechnung `/abrechnung` | Kosten bisher (Hauptzahl), Aufteilung, „Abrechnung abschließen“, Hauszähler, Rechenweg |
-| Verlauf `/verlauf` | Umschalter Ladevorgänge/Abrechnungen. Ladevorgänge nach Monat (alle Monate); ohne Person alle, mit Person „ihre + offene“ – kein weiterer Filter; oben eine Karte „n ohne Zuordnung · Übernehmen“; Aktualisieren oben rechts; „Mehrere zuordnen“; Detail-Sheet mit Titel = Beginn, Geladen/Standzeit-Balken; Abrechnungen mit Detail-Sheet, alte Sicherungen |
+| Verlauf `/verlauf` | Umschalter Ladevorgänge/Abrechnungen. Ladevorgänge nach Monat (alle Monate); ohne Person alle, mit Person „ihre + offene“ – kein weiterer Filter; oben eine Karte „n ohne Zuordnung · Übernehmen“ → Sheet: Auswahl „Alle“ oder eine Person (vorausgewählt: aktuelle Ansicht), kurze Liste der betroffenen Ladevorgänge, Bestätigen; Aktualisieren oben rechts; „Mehrere zuordnen“; Detail-Sheet mit Titel = Beginn, Geladen/Standzeit-Balken; Abrechnungen mit Detail-Sheet, alte Sicherungen |
 | Einstellungen `/einstellungen` | Wallbox, Strompreis, Personen, Ladeverlauf, Teilen & Sichern, Daten übernehmen, Design, Kiosk, Hilfe, Alles löschen |
 | Willkommen (Overlay) | einmalig beim ersten Start von V2: Logo, 3 Neuerungen, Hinweis auf Sicherung, „Los geht’s“ |
 | Kiosk `/kiosk` | immer dunkel, sehr große Schrift, Bildschirm bleibt an, ohne Navigation |
