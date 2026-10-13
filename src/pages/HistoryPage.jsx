@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ClockIcon,
   PencilSquareIcon,
@@ -15,6 +15,7 @@ import {
   Page,
   Section,
   Card,
+  Chip,
   List,
   ListItem,
   Button,
@@ -207,7 +208,7 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
   );
 }
 
-// filter: 'all' (ohne Person: alle; mit Person: ihre + offene), 'mine' (nur die Person), 'open' (nur offene)
+// filter: 'all' (ohne Person: alle; mit Person: ihre + offene) oder 'open' (nur offene)
 function SessionsView({ filter, setFilter }) {
   const onlyOpen = filter === 'open';
   const toast = useToast();
@@ -236,7 +237,6 @@ function SessionsView({ filter, setFilter }) {
   const visible = withOwner.filter((s) => {
     if (onlyOpen) return s.owner === UNASSIGNED;
     if (!person) return true;
-    if (filter === 'mine') return s.owner === person.key;
     return s.owner === person.key || s.owner === UNASSIGNED;
   });
 
@@ -296,53 +296,39 @@ function SessionsView({ filter, setFilter }) {
           {history.error} Angezeigt wird der zuletzt geladene Stand.
         </Banner>
       )}
+      {/* Eine Zeile: was gerade zu sehen ist, Filter "Offen" als Chip, Aktualisieren */}
       <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <Segmented
-            label="Filter"
-            value={person || filter !== 'mine' ? filter : 'all'}
-            onChange={setFilter}
-            options={[
-              ...(person
-                ? [
-                    { value: 'all', label: `${person.name} & offen` },
-                    { value: 'mine', label: person.name }
-                  ]
-                : [{ value: 'all', label: 'Alle' }]),
-              { value: 'open', label: `Offen${openCount ? ` (${openCount})` : ''}` }
-            ]}
-          />
-        </div>
+        <p className="min-w-0 flex-1 truncate px-1 text-caption text-muted">{onlyOpen ? 'Nur offene' : person ? `${person.name} + offene` : 'Alle'}</p>
+        {openCount > 0 && (
+          <Chip pressed={onlyOpen} onClick={() => setFilter(onlyOpen ? 'all' : 'open')} tone="warning">
+            Offen {openCount}
+          </Chip>
+        )}
         <IconButton icon={ArrowPathIcon} label="Ladeverlauf aktualisieren" onClick={() => history.sync(true)} spinning={history.loading} />
       </div>
 
-      {filter !== 'mine' && (onlyOpen || person) && !demo && suggestions.size > 0 && (
-        <Banner
-          tone="primary"
-          icon={SparklesIcon}
-          title={`${suggestions.size} Vorschl${suggestions.size === 1 ? 'ag' : 'äge'} nach Ladeleistung`}
-          action={
+      {/* Vorschläge: kompakt, nur wenn es etwas zu tun gibt */}
+      {!demo && suggestions.size > 0 && (onlyOpen || person) && (
+        <Card padded={false}>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <SparklesIcon className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <p className="min-w-0 flex-1 text-body text-ink">
+              {suggestions.size} Vorschl{suggestions.size === 1 ? 'ag' : 'äge'} nach Ladeleistung
+            </p>
             <Button size="sm" onClick={() => setConfirmAll(true)}>
-              Alle übernehmen
+              Übernehmen
             </Button>
-          }
-        >
-          Verglichen wird die Spitzenleistung mit der typischen Ladeleistung jeder Person (einstellbar unter Personen).
-        </Banner>
+          </div>
+        </Card>
       )}
-      {onlyOpen && !demo && suggestions.size === 0 && openCount > 0 && powers.size === 0 && (
-        <Banner
-          tone="primary"
-          icon={SparklesIcon}
-          title="Tipp: Vorschläge einschalten"
-          action={
-            <Button size="sm" variant="plain" to="/einstellungen/personen">
-              Zu den Personen
-            </Button>
-          }
-        >
-          Trag in den Profilen ein, wie schnell das jeweilige Auto lädt (z. B. 3,7 kW einphasig oder 11 kW dreiphasig). Dann schlägt Wall-E die passende Person vor.
-        </Banner>
+      {!demo && onlyOpen && suggestions.size === 0 && powers.size === 0 && (
+        <p className="px-1 text-caption text-muted">
+          Tipp: Trag unter{' '}
+          <Link to="/einstellungen/personen" className="font-semibold text-primary">
+            Personen
+          </Link>{' '}
+          die Ladeleistung der Autos ein (z. B. 3,7 oder 11 kW), dann schlägt Wall-E die passende Person vor.
+        </p>
       )}
 
       {visible.length === 0 ? (

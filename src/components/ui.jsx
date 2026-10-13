@@ -189,6 +189,24 @@ export function Badge({ tone = 'neutral', children, dot }) {
   );
 }
 
+// Filter-Chip zum Ein-/Ausschalten (z. B. „Offen 27“)
+export function Chip({ pressed, onClick, tone = 'primary', children }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={cx(
+        'inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-caption font-semibold transition-colors',
+        pressed ? (tone === 'warning' ? 'bg-warning text-white dark:text-bg' : 'bg-primary text-primary-on') : TONES_SOFT[tone]
+      )}
+    >
+      {children}
+      {pressed && <XMarkIcon className="-mr-1 h-4 w-4" aria-hidden="true" />}
+    </button>
+  );
+}
+
 export function Banner({ tone = 'primary', icon: Icon, title, children, action }) {
   return (
     <div className={cx('flex items-start gap-3 rounded-card p-4', TONES_SOFT[tone])} role={tone === 'danger' ? 'alert' : undefined}>

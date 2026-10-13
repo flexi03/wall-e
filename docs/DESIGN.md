@@ -59,6 +59,7 @@ Karteninnen `p-4 sm:p-5`.
 - `TextField`, `NumberField` (Komma-Tastatur, Einheit rechts), `Segmented`, `Checkbox`
 - `Sheet`, `ConfirmSheet`, `ToastProvider`/`useToast`
 - `PersonDot`, `SplitBar` (`colors`: Farbindex je Zeile, `null` = grau; `highlight`: eine Zeile betonen)
+- `Chip` (Filter zum An-/Ausschalten, gedrückt mit ×)
 - `PersonBadge` (Etikett in der Farbe einer Person, z. B. Vorschlag „Name?“), `SplitLegend` (zwei Anteile als Balken mit Stunden und %, z. B. Geladen/Standzeit)
 - `Stat` kürzt nie ab – Werte und Hinweise brechen um, damit in Sheets alles lesbar ist
 - `PersonPicker` (`components/PersonPicker.jsx`): Pille „Alle ▾“ / „Name ▾“ rechts im Seitenkopf von Live,
@@ -72,7 +73,7 @@ Neue Muster zuerst hier ergänzen, dann benutzen – keine Einzel-Stile in Seite
 |---|---|
 | Live `/` | Status-Badge, Leistung (Hauptzahl), diese Ladung + Karte, laufende Abrechnung, Wallbox-Werte, RFID-Karten |
 | Abrechnung `/abrechnung` | Kosten bisher (Hauptzahl), Aufteilung, „Abrechnung abschließen“, Hauszähler, Rechenweg |
-| Verlauf `/verlauf` | Umschalter Ladevorgänge/Abrechnungen. Ladevorgänge nach Monat, Filter Alle/Offen bzw. mit gewählter Person „Name & offen“ (Standard) / „Name“ / „Offen“, „Mehrere zuordnen“; Detail-Sheet mit Titel = Beginn, Geladen/Standzeit-Balken; Abrechnungen mit Detail-Sheet, alte Sicherungen |
+| Verlauf `/verlauf` | Umschalter Ladevorgänge/Abrechnungen. Ladevorgänge nach Monat; ohne Person alle, mit Person „ihre + offene“; Chip „Offen n“ filtert auf offene; eine kompakte Zeile „n Vorschläge – Übernehmen“; „Mehrere zuordnen“; Detail-Sheet mit Titel = Beginn, Geladen/Standzeit-Balken; Abrechnungen mit Detail-Sheet, alte Sicherungen |
 | Einstellungen `/einstellungen` | Wallbox, Strompreis, Personen, Ladeverlauf, Teilen & Sichern, Daten übernehmen, Design, Kiosk, Hilfe, Alles löschen |
 | Willkommen (Overlay) | einmalig beim ersten Start von V2: Logo, 3 Neuerungen, Hinweis auf Sicherung, „Los geht’s“ |
 | Kiosk `/kiosk` | immer dunkel, sehr große Schrift, Bildschirm bleibt an, ohne Navigation |
