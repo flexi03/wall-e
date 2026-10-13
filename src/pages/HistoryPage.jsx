@@ -222,13 +222,26 @@ function SessionSheet({ session, persons, owners, price, onClose, readOnly, sugg
 function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons, initialScope, onDone }) {
   const [scope, setScope] = useState(initialScope);
   const [detailId, setDetailId] = useState(null);
+  const [excluded, setExcluded] = useState(() => new Set()); // abgewählte Ladevorgänge
   const price = useStored(store.getPrice);
   useEffect(() => {
     if (open) {
       setScope(initialScope);
       setDetailId(null);
+      setExcluded(new Set());
     }
   }, [open, initialScope]);
+  const chooseScope = (key) => {
+    setScope(key);
+    setExcluded(new Set());
+  };
+  const toggle = (id) =>
+    setExcluded((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const counts = new Map();
   suggestions.forEach((sug) => counts.set(sug.key, (counts.get(sug.key) || 0) + 1));
@@ -238,15 +251,17 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
   ];
   const active = scopes.some((x) => x.key === scope) ? scope : 'all';
   const chosen = sessions.filter((s) => suggestions.has(s.id) && (active === 'all' || suggestions.get(s.id).key === active));
+  const selected = chosen.filter((s) => !excluded.has(s.id));
 
-  const accept = () => {
+  // Übernimmt die angegebenen Ladevorgänge (Standard: alle angehakten)
+  const accept = (list = selected) => {
     const byPerson = new Map();
-    chosen.forEach((s) => {
+    list.forEach((s) => {
       const key = suggestions.get(s.id).key;
       byPerson.set(key, [...(byPerson.get(key) || []), s.id]);
     });
     byPerson.forEach((ids, key) => store.setSessionOwners(ids, key));
-    onDone(chosen.length);
+    onDone(list.length);
     onClose();
   };
 
@@ -266,12 +281,17 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
       title={detail ? `${weekday(detail.start)}, ${time(detail.start)} Uhr` : 'Vorschläge übernehmen'}
       footer={
         detail ? (
-          <Button block size="lg" variant="plain" icon={ChevronLeftIcon} onClick={() => setDetailId(null)}>
-            Zurück zur Liste
-          </Button>
+          <div className="flex gap-2">
+            <Button size="lg" variant="plain" icon={ChevronLeftIcon} onClick={() => setDetailId(null)} aria-label="Zurück zur Liste">
+              Liste
+            </Button>
+            <Button block size="lg" onClick={() => accept([detail])}>
+              Nur diesen zuordnen
+            </Button>
+          </div>
         ) : (
-          <Button block size="lg" disabled={chosen.length === 0} onClick={accept}>
-            {chosen.length} Ladevorg{chosen.length === 1 ? 'ang' : 'änge'} zuordnen
+          <Button block size="lg" disabled={selected.length === 0} onClick={() => accept()}>
+            {selected.length} Ladevorg{selected.length === 1 ? 'ang' : 'änge'} zuordnen
           </Button>
         )
       }
@@ -294,7 +314,7 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
               <button
                 key={x.key}
                 type="button"
-                onClick={() => setScope(x.key)}
+                onClick={() => chooseScope(x.key)}
                 className="flex min-h-[3.25rem] w-full items-center gap-3 px-5 text-left hover:bg-surface-2"
                 aria-pressed={active === x.key}
               >
@@ -311,32 +331,58 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
             ))}
           </div>
 
-          <h3 className="mb-2 mt-5 text-caption font-semibold text-muted">Wird zugeordnet · antippen für Details</h3>
+          <div className="mb-2 mt-5 flex items-center justify-between gap-3 px-1">
+            <h3 className="text-caption font-semibold text-muted">
+              {selected.length} von {chosen.length} ausgewählt
+            </h3>
+            <button
+              type="button"
+              className="min-h-8 text-caption font-semibold text-primary"
+              onClick={() => setExcluded(excluded.size === 0 ? new Set(chosen.map((s) => s.id)) : new Set())}
+            >
+              {excluded.size === 0 ? 'Keine' : 'Alle'} auswählen
+            </button>
+          </div>
           <Card padded={false} className="divide-y divide-line bg-surface-2 shadow-none">
             {chosen.map((s) => {
               const target = persons.find((p) => p.key === suggestions.get(s.id).key);
               return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setDetailId(s.id)}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-body text-ink">
-                      {weekday(s.start)} · {time(s.start)}
+                <div key={s.id} className={`flex items-center transition-opacity ${excluded.has(s.id) ? 'opacity-50' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggle(s.id)}
+                    aria-pressed={!excluded.has(s.id)}
+                    aria-label={`${weekday(s.start)} ${time(s.start)} ${excluded.has(s.id) ? 'auswählen' : 'abwählen'}`}
+                    className="flex min-h-[3.25rem] shrink-0 items-center pl-4 pr-1"
+                  >
+                    <span
+                      className={`flex h-6 w-6 items-center justify-center rounded-md border-2 ${excluded.has(s.id) ? 'border-line' : 'border-primary bg-primary text-primary-on'}`}
+                      aria-hidden="true"
+                    >
+                      {!excluded.has(s.id) && <CheckIcon className="h-4 w-4" />}
                     </span>
-                    <span className="tabular block text-caption text-muted">
-                      {formatKwh(s.kwh)} · max. {kw(sessionStats(s).peakKw)}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDetailId(s.id)}
+                    className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-2 pr-4 text-left transition-colors hover:bg-surface"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-body text-ink">
+                        {weekday(s.start)} · {time(s.start)}
+                      </span>
+                      <span className="tabular block text-caption text-muted">
+                        {formatKwh(s.kwh)} · max. {kw(sessionStats(s).peakKw)}
+                      </span>
                     </span>
-                  </span>
-                  {target && <PersonBadge index={target.colorIndex}>{target.name}</PersonBadge>}
-                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-subtle" aria-hidden="true" />
-                </button>
+                    {target && <PersonBadge index={target.colorIndex}>{target.name}</PersonBadge>}
+                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-subtle" aria-hidden="true" />
+                  </button>
+                </div>
               );
             })}
           </Card>
-          <p className="mt-3 text-caption text-muted">Jede Zuordnung lässt sich später im Ladevorgang ändern.</p>
+          <p className="mt-3 text-caption text-muted">Haken = wird zugeordnet. Antippen zeigt Details. Jede Zuordnung lässt sich später ändern.</p>
         </>
       )}
     </Sheet>
