@@ -1,0 +1,5 @@
+# Nur status.php, test.php und history.php sind öffentlich; goe.php ist eine Hilfsdatei
+Options -Indexes
+<Files "goe.php">
+  Require all denied
+</Files>

@@ -1,0 +1,5 @@
+# Dateien, die scripts/publish.sh NICHT ins öffentliche Repo kopiert (eine Zeile pro Pfad, relativ zu wall-e/)
+PRIVATE.md
+CLAUDE.md
+site.config.js
+.publish-denylist

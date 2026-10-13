@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design-Tokens (RGB-Tripel). Nur hier Farben definieren – siehe docs/DESIGN.md */
+@layer base {
+  :root {
+    --bg: 243 244 247;
+    --surface: 255 255 255;
+    --surface-2: 238 240 244;
+    --line: 226 229 235;
+    --ink: 16 20 28;
+    --muted: 96 104 119;
+    --subtle: 146 153 167;
+
+    --primary: 37 99 235;
+    --primary-soft: 230 238 253;
+    --on-primary: 255 255 255;
+    --success: 21 158 75;
+    --success-soft: 228 246 235;
+    --warning: 209 115 5;
+    --warning-soft: 253 242 224;
+    --danger: 214 41 41;
+    --danger-soft: 252 233 233;
+
+    --person-1: 37 99 235;
+    --person-2: 16 163 127;
+    --person-3: 139 92 246;
+    --person-4: 234 138 10;
+    --person-5: 225 29 97;
+    --person-6: 8 145 178;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --bg: 10 12 16;
+    --surface: 21 24 30;
+    --surface-2: 30 34 42;
+    --line: 41 46 56;
+    --ink: 240 242 246;
+    --muted: 158 165 178;
+    --subtle: 110 117 131;
+
+    --primary: 92 141 255;
+    --primary-soft: 28 40 70;
+    --on-primary: 255 255 255;
+    --success: 64 211 122;
+    --success-soft: 18 46 31;
+    --warning: 246 178 46;
+    --warning-soft: 56 40 12;
+    --danger: 248 113 113;
+    --danger-soft: 62 24 24;
+
+    --person-1: 92 141 255;
+    --person-2: 52 211 166;
+    --person-3: 167 139 250;
+    --person-4: 251 172 60;
+    --person-5: 244 114 160;
+    --person-6: 56 189 220;
+
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-bg text-ink font-sans text-body antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* Zahlen immer gleich breit, damit Werte beim Aktualisieren nicht springen */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--primary));
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

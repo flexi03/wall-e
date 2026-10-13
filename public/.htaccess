@@ -1,0 +1,39 @@
+# Wall-E (Apache): HTTPS, Sicherheits-Header, SPA-Routing, Caching
+Options -Indexes -MultiViews
+RewriteEngine On
+RewriteBase /
+
+# Immer HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Versteckte Dateien, Source-Maps, Notizen und Altlasten sperren
+RewriteRule (^|/)\.(?!well-known(/|$)) - [F]
+RewriteRule \.(map|md|txt|log|bak|sql|sh|env)$ - [F,NC]
+
+# React-Router: alle unbekannten Pfade zur App (API und Assets ausgenommen)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/(api|assets)/
+RewriteCond %{REQUEST_URI} !\.php$
+RewriteRule ^ /index.html [L]
+
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000" "expr=%{HTTPS} == 'on'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://data.v3.go-e.io; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+  # index.html nie cachen (sonst laden Handys alte Versionen), gehashte Assets lange
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "\.(js|css|png|svg|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(manifest\.json|sw\.js)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

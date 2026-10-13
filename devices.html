@@ -1,0 +1,20 @@
+<!doctype html>
+<!-- Nur für die Entwicklung (npm run dev → /devices.html): App in Handy- und Tablet-Größe nebeneinander. Wird nicht gebaut. -->
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Wall-E · Geräte-Vorschau</title>
+<style>
+  body { margin: 0; padding: 24px; background: #2a2d34; font: 13px -apple-system, sans-serif; color: #ccc; display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  figure { margin: 0; }
+  figcaption { margin-bottom: 8px; }
+  iframe { border: 0; border-radius: 28px; background: #fff; box-shadow: 0 10px 40px rgb(0 0 0 / .4); }
+</style>
+</head>
+<body>
+  <figure><figcaption>iPhone 15 (393 × 852)</figcaption><iframe id="phone" src="/" width="393" height="852"></iframe></figure>
+  <figure><figcaption>iPhone SE (375 × 667)</figcaption><iframe src="/" width="375" height="667"></iframe></figure>
+  <figure><figcaption>iPad hochkant (820 × 1180)</figcaption><iframe src="/" width="820" height="1180"></iframe></figure>
+  <figure><figcaption>Laptop (1280 × 800, verkleinert)</figcaption><div style="width:768px;height:480px;overflow:hidden;border-radius:16px"><iframe src="/" width="1280" height="800" style="transform:scale(.6);transform-origin:0 0;border-radius:0"></iframe></div></figure>
+</body>
+</html>
