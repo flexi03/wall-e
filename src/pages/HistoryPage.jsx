@@ -222,7 +222,6 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
   ];
   const active = scopes.some((x) => x.key === scope) ? scope : 'all';
   const chosen = sessions.filter((s) => suggestions.has(s.id) && (active === 'all' || suggestions.get(s.id).key === active));
-  const PREVIEW = 6;
 
   const accept = () => {
     const byPerson = new Map();
@@ -271,7 +270,7 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
 
       <h3 className="mb-2 mt-5 text-caption font-semibold text-muted">Wird zugeordnet</h3>
       <Card padded={false} className="divide-y divide-line bg-surface-2 shadow-none">
-        {chosen.slice(0, PREVIEW).map((s) => {
+        {chosen.map((s) => {
           const target = persons.find((p) => p.key === suggestions.get(s.id).key);
           return (
             <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
@@ -287,7 +286,6 @@ function AcceptSuggestionsSheet({ open, onClose, sessions, suggestions, persons,
             </div>
           );
         })}
-        {chosen.length > PREVIEW && <p className="px-4 py-2.5 text-caption text-muted">… und {chosen.length - PREVIEW} weitere</p>}
       </Card>
       <p className="mt-3 text-caption text-muted">Jede Zuordnung lässt sich später im Ladevorgang ändern.</p>
     </Sheet>
