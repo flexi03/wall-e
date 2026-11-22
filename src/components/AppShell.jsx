@@ -9,6 +9,7 @@ import {
   Cog6ToothIcon as CogSolid
 } from '@heroicons/react/24/solid';
 import { useStatus } from '../hooks/data.js';
+import SyncInbox from './SyncInbox.jsx';
 
 export const NAV = [
   { to: '/', label: 'Live', icon: BoltIcon, activeIcon: BoltSolid, end: true },
@@ -72,6 +73,7 @@ export default function AppShell() {
       </aside>
 
       <main className="pb-[calc(4.75rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] lg:pb-0">
+        <SyncInbox />
         <Outlet />
       </main>
 

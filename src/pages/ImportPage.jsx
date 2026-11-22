@@ -5,6 +5,7 @@ import { Page, Section, Card, List, Button, Banner, Checkbox, TextField, Spinner
 import * as store from '../lib/storage.js';
 import { SECTIONS, describePayload, readLinkOrCode, readFile, applyPayload } from '../lib/share.js';
 import { isStandalone, isIos } from '../lib/install.js';
+import { joinWithKey } from '../lib/sync.js';
 import { formatDate } from '../lib/format.js';
 
 // Was würde beim Import überschrieben?
@@ -96,6 +97,21 @@ export default function ImportPage() {
 
   // iPhone: Links öffnen in Safari, die installierte App hat aber einen eigenen Speicher
   const iosBrowser = fromLink && isIos() && !isStandalone();
+  // Einladung zu „Gemeinsam nutzen“: nur der Schlüssel, eigene Daten bleiben
+  const inviteOnly = payload && payload.data && payload.data.sync && describePayload(payload).length === 1;
+
+  const joinInvite = async () => {
+    setBusy(true);
+    try {
+      await joinWithKey(payload.data.sync.key);
+      toast('Beigetreten – Änderungen werden ab jetzt abgeglichen');
+      navigate('/einstellungen/gemeinsam');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Page title="Daten übernehmen" back={{ to: '/einstellungen/teilen', label: 'Teilen & Sichern' }}>
@@ -130,9 +146,28 @@ export default function ImportPage() {
                 </Button>
               }
             >
-              Dann kopiere den Link und füge ihn in der App unter Einstellungen → Daten übernehmen ein. Safari und die App speichern getrennt.
+              {inviteOnly
+                ? 'Dann kopiere den Link und füge ihn in der App unter Einstellungen → Gemeinsam nutzen → Einladung einfügen ein. Safari und die App speichern getrennt.'
+                : 'Dann kopiere den Link und füge ihn in der App unter Einstellungen → Daten übernehmen ein. Safari und die App speichern getrennt.'}
             </Banner>
           )}
+          {inviteOnly ? (
+            <>
+              <Card>
+                <p className="text-headline text-ink">Einladung zu „Gemeinsam nutzen“</p>
+                <p className="mt-2 text-body text-muted">
+                  Deine Daten auf diesem Gerät bleiben, wie sie sind. Ab jetzt werden Zählerstände, Zuordnungen, Personen, Preise und Abrechnungen verschlüsselt mit den anderen abgeglichen.
+                </p>
+              </Card>
+              <Button size="lg" block onClick={joinInvite} loading={busy}>
+                Beitreten
+              </Button>
+              <Button variant="ghost" block onClick={() => setPayload(null)}>
+                Abbrechen
+              </Button>
+            </>
+          ) : (
+          <>
           <Section title={`Enthalten · erstellt ${formatDate(payload.createdAt, true)}`} footer="Ausgewählte Bereiche ersetzen die Daten auf diesem Gerät. Unter Einstellungen kannst du den Import rückgängig machen.">
             <List>
               {describePayload(payload).map((item) => {
@@ -155,6 +190,8 @@ export default function ImportPage() {
           <Button variant="ghost" block onClick={() => setPayload(null)}>
             Andere Daten wählen
           </Button>
+          </>
+          )}
         </>
       ) : (
         !busy && (

@@ -35,8 +35,15 @@ export const KEYS = {
   sessionsAt: 'wall_e_sessions_at',
   sessionsFrom: 'wall_e_sessions_from', // ab wann der Ladeverlauf vollständig geladen wurde (ISO)
   standardLoss: 'wall_e_standard_loss', // pauschaler Ladeverlust in %, solange keine Messung möglich ist
+  // Gemeinsam nutzen (ab 2.1): Schlüssel/Gerät, offene Änderungen anderer, noch nicht gesendete, Zeitstempel
+  sync: 'wall_e_sync', // { key, device, auto, notify }
+  syncInbox: 'wall_e_sync_inbox',
+  syncOutbox: 'wall_e_sync_outbox',
+  syncStamps: 'wall_e_sync_stamps',
+  syncRemoved: 'wall_e_sync_removed', // Zeitpunkt, an dem ein anderes Gerät dieses entfernt hat (Hinweis)
   historyLink: 'wall_e_history_link', // Export-Link, falls die Wallbox keinen liefert
   welcome: 'wall_e_welcome', // zuletzt gezeigter Willkommens-Bildschirm (Version)
+  seenVersion: 'wall_e_seen_version', // App-Version, deren Neuerungen zuletzt gezeigt wurden
   backupV1: 'wall_e_backup_v1' // automatische Sicherung beim ersten Start von V2
 };
 
@@ -56,6 +63,26 @@ export function subscribe(listener) {
 
 function notify() {
   listeners.forEach((listener) => listener());
+}
+
+// ---------- Änderungen für „Gemeinsam nutzen“ ----------
+//
+// Jede Schreibfunktion, deren Ergebnis andere Geräte sehen sollen, meldet hier eine Änderung.
+// Beim Einspielen fremder Änderungen (applyRemote) wird nichts gemeldet – sonst ginge es hin und her.
+const changeListeners = new Set();
+let applyingRemote = false;
+
+export function onLocalChange(listener) {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
+function emitChange(type, data) {
+  if (applyingRemote) return;
+  const sync = getSync();
+  if (!sync) return;
+  if (STAMPED.includes(type)) setStamp(type, new Date().toISOString());
+  changeListeners.forEach((listener) => listener(type, data));
 }
 
 // Änderungen aus einem anderen Tab übernehmen
@@ -202,6 +229,7 @@ export function getPriceHistory() {
 
 export function setActivePrice(price) {
   setRaw(KEYS.price, String(price));
+  emitChange('prices', pricesSnapshot());
 }
 
 export function addPrice(label, price) {
@@ -215,15 +243,22 @@ export function addPrice(label, price) {
     sj(KEYS.priceHistory, [entry, ...getPriceHistory()]);
     set(KEYS.price, String(price));
   });
+  emitChange('prices', pricesSnapshot());
   return entry;
 }
 
 export function updatePrice(id, changes) {
   setJson(KEYS.priceHistory, getPriceHistory().map((p) => (p.id === id ? { ...p, ...changes } : p)));
+  emitChange('prices', pricesSnapshot());
 }
 
 export function deletePrice(id) {
   setJson(KEYS.priceHistory, getPriceHistory().filter((p) => p.id !== id));
+  emitChange('prices', pricesSnapshot());
+}
+
+function pricesSnapshot() {
+  return { price: getRaw(KEYS.price), history: getJson(KEYS.priceHistory, []) };
 }
 
 function formatPlain(n) {
@@ -258,6 +293,7 @@ export function setCurrentMeter(value, at) {
     set(KEYS.currentMeter, value === null ? null : String(value));
     set(KEYS.currentMeterAt, value === null ? null : at || new Date().toISOString());
   });
+  if (value !== null) emitChange('meter', { current: getRaw(KEYS.currentMeter), currentAt: getRaw(KEYS.currentMeterAt) });
 }
 
 // Startwert setzen (V1: "Baseline speichern"): merkt sich zugleich den aktuellen Wallbox-Stand
@@ -273,6 +309,7 @@ export function setStartMeter(value, wallboxTotals) {
     set(KEYS.startMeterAt, new Date().toISOString());
     sj(KEYS.baseline, baseline);
   });
+  emitChange('billing', { what: 'start', ...billingSnapshot() });
 }
 
 // Nur die Zahl des Startwerts korrigieren. Kartenstände und Beginn der Abrechnung bleiben:
@@ -284,6 +321,7 @@ export function correctStartMeter(value, periodStartMs = null) {
     set(KEYS.startMeter, String(value));
     sj(KEYS.baseline, { ...baseline, meterReading: value, ...(at ? { at } : {}) });
   });
+  emitChange('billing', { what: 'start', ...billingSnapshot() });
 }
 
 // Pauschaler Ladeverlust (Anteil, z. B. 0.016), solange der Hauszähler keine plausible Messung erlaubt
@@ -294,6 +332,23 @@ export function getStandardLoss() {
 
 export function setStandardLoss(percent) {
   setRaw(KEYS.standardLoss, percent === null || isNaN(percent) ? null : String(percent));
+  emitChange('settings', { what: 'loss', ...settingsSnapshot() });
+}
+
+function settingsSnapshot() {
+  return { unassignedMode: getRaw(KEYS.unassignedMode), standardLoss: getRaw(KEYS.standardLoss) };
+}
+
+// Rohwerte (genau die V1-Formate) für den Abgleich
+function billingSnapshot() {
+  return {
+    baseline: getJson(KEYS.baseline, null),
+    startMeter: getRaw(KEYS.startMeter),
+    startMeterAt: getRaw(KEYS.startMeterAt),
+    currentMeter: getRaw(KEYS.currentMeter),
+    currentMeterAt: getRaw(KEYS.currentMeterAt),
+    periods: getJson(KEYS.periods, [])
+  };
 }
 
 export function getPeriods() {
@@ -311,6 +366,7 @@ export function deleteSnapshot(id) {
 }
 
 export function savePeriods(periods, baseline) {
+  const before = getPeriods().length;
   batch(({ set, setJson: sj }) => {
     sj(KEYS.periods, periods);
     if (baseline !== undefined) {
@@ -322,6 +378,8 @@ export function savePeriods(periods, baseline) {
       }
     }
   });
+  const what = periods.length > before ? 'close' : periods.length < before ? 'delete' : 'edit';
+  emitChange('billing', { what, label: what === 'close' && periods[0] ? periods[0].label : undefined, ...billingSnapshot() });
 }
 
 // ---------- Darstellung ----------
@@ -352,10 +410,18 @@ export function setWelcomeSeen(version) {
   setRaw(KEYS.welcome, version);
 }
 
+export function getSeenVersion() {
+  return getRaw(KEYS.seenVersion);
+}
+
+export function setSeenVersion(version) {
+  setRaw(KEYS.seenVersion, version);
+}
+
 export function clearAll() {
   batch(({ set }) => {
     allKeys().forEach((key) => {
-      if (key !== KEYS.welcome) set(key, null);
+      if (key !== KEYS.welcome && key !== KEYS.seenVersion) set(key, null);
     });
   });
 }
@@ -373,6 +439,7 @@ export function saveProfile(profile) {
   const cleaned = profiles.map((p) => (p.id === profile.id ? p : { ...p, cards: p.cards.filter((c) => !profile.cards.includes(c)) }));
   const exists = cleaned.some((p) => p.id === profile.id);
   setJson(KEYS.profiles, exists ? cleaned.map((p) => (p.id === profile.id ? profile : p)) : [...cleaned, profile]);
+  emitChange('profile', { upsert: profile, isNew: !exists });
 }
 
 export function newProfileId() {
@@ -381,11 +448,13 @@ export function newProfileId() {
 
 export function deleteProfile(id) {
   const owners = getSessionOwners();
+  const removed = getProfiles().find((p) => p.id === id);
   batch(({ setJson: sj, set }) => {
     sj(KEYS.profiles, getProfiles().filter((p) => p.id !== id));
     sj(KEYS.sessionOwners, Object.fromEntries(Object.entries(owners).filter(([, owner]) => owner !== id)));
     if (getRaw(KEYS.me) === id) set(KEYS.me, null);
   });
+  if (removed) emitChange('profile', { remove: id, name: removed.name });
 }
 
 export function getSessionOwners() {
@@ -401,6 +470,7 @@ export function setSessionOwners(sessionIds, owner) {
     else delete owners[id];
   });
   setJson(KEYS.sessionOwners, owners);
+  emitChange('owners', { changes: Object.fromEntries(sessionIds.map((id) => [id, owner || null])) });
 }
 
 export function getUnassignedMode() {
@@ -409,6 +479,7 @@ export function getUnassignedMode() {
 
 export function setUnassignedMode(mode) {
   setRaw(KEYS.unassignedMode, mode === 'split' ? 'split' : null);
+  emitChange('settings', { what: 'unassigned', ...settingsSnapshot() });
 }
 
 export function getMe() {
@@ -480,5 +551,137 @@ export function restoreLocalBackup() {
   batch(({ set }) => {
     Object.entries(backup.values).forEach(([key, value]) => set(key, value));
   });
+  return true;
+}
+
+// ---------- Gemeinsam nutzen ----------
+
+export function getSync() {
+  const sync = getJson(KEYS.sync, null);
+  return sync && typeof sync.key === 'string' && typeof sync.device === 'string' ? { auto: true, notify: false, ...sync } : null;
+}
+
+export function setSync(sync) {
+  setJson(KEYS.sync, sync);
+}
+
+export function updateSync(changes) {
+  const sync = getSync();
+  if (sync) setJson(KEYS.sync, { ...sync, ...changes });
+}
+
+// Ganz beenden: Schlüssel, offene und ungesendete Änderungen entfernen (eigene Daten bleiben)
+export function clearSync() {
+  batch(({ set }) => [KEYS.sync, KEYS.syncInbox, KEYS.syncOutbox, KEYS.syncStamps].forEach((key) => set(key, null)));
+}
+
+export function getSyncRemoved() {
+  return getRaw(KEYS.syncRemoved);
+}
+
+export function setSyncRemoved(at) {
+  setRaw(KEYS.syncRemoved, at);
+}
+
+export function getSyncInbox() {
+  const list = getJson(KEYS.syncInbox, []);
+  return Array.isArray(list) ? list : [];
+}
+
+export function setSyncInbox(list) {
+  setJson(KEYS.syncInbox, list.length ? list : null);
+}
+
+export function getSyncOutbox() {
+  const list = getJson(KEYS.syncOutbox, []);
+  return Array.isArray(list) ? list : [];
+}
+
+export function setSyncOutbox(list) {
+  setJson(KEYS.syncOutbox, list.length ? list : null);
+}
+
+// Für ganze Bereiche (Abrechnung, Preise, Einstellungen) gilt die neueste Änderung
+const STAMPED = ['billing', 'prices', 'settings'];
+
+function getStamps() {
+  const stamps = getJson(KEYS.syncStamps, {});
+  return stamps && typeof stamps === 'object' ? stamps : {};
+}
+
+function setStamp(type, at) {
+  setJson(KEYS.syncStamps, { ...getStamps(), [type]: at });
+}
+
+// Nach einem übernommenen Gesamtstand: ältere Einzeländerungen danach nicht mehr übernehmen
+export function markSynced(types, at) {
+  setJson(KEYS.syncStamps, { ...getStamps(), ...Object.fromEntries(types.map((t) => [t, at])) });
+}
+
+/**
+ * Änderung eines anderen Geräts einspielen. Gibt false zurück, wenn sie älter ist als der eigene Stand
+ * (dann bleibt alles, wie es ist).
+ */
+export function applyRemote(change) {
+  const { type, data, at } = change;
+  if (STAMPED.includes(type)) {
+    const mine = getStamps()[type];
+    if (mine && Date.parse(at) < Date.parse(mine)) return false;
+  }
+  if (type === 'meter') {
+    const localAt = getRaw(KEYS.currentMeterAt);
+    if (localAt && data.currentAt && Date.parse(data.currentAt) < Date.parse(localAt)) return false;
+  }
+  applyingRemote = true;
+  try {
+    switch (type) {
+      case 'meter':
+        batch(({ set }) => {
+          set(KEYS.currentMeter, data.current);
+          set(KEYS.currentMeterAt, data.currentAt);
+        });
+        break;
+      case 'billing':
+        batch(({ set, setJson: sj }) => {
+          sj(KEYS.baseline, data.baseline);
+          set(KEYS.startMeter, data.startMeter);
+          set(KEYS.startMeterAt, data.startMeterAt);
+          set(KEYS.currentMeter, data.currentMeter);
+          set(KEYS.currentMeterAt, data.currentMeterAt);
+          sj(KEYS.periods, Array.isArray(data.periods) ? data.periods : []);
+        });
+        break;
+      case 'prices':
+        batch(({ set, setJson: sj }) => {
+          set(KEYS.price, data.price);
+          sj(KEYS.priceHistory, Array.isArray(data.history) ? data.history : []);
+        });
+        break;
+      case 'settings':
+        batch(({ set }) => {
+          set(KEYS.unassignedMode, data.unassignedMode);
+          set(KEYS.standardLoss, data.standardLoss);
+        });
+        break;
+      case 'owners': {
+        const owners = { ...getSessionOwners() };
+        Object.entries(data.changes || {}).forEach(([id, owner]) => {
+          if (owner) owners[id] = owner;
+          else delete owners[id];
+        });
+        setJson(KEYS.sessionOwners, owners);
+        break;
+      }
+      case 'profile':
+        if (data.upsert) saveProfile(data.upsert);
+        if (data.remove) deleteProfile(data.remove);
+        break;
+      default:
+        return false;
+    }
+  } finally {
+    applyingRemote = false;
+  }
+  if (STAMPED.includes(type)) setStamp(type, at);
   return true;
 }

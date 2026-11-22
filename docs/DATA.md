@@ -27,7 +27,13 @@ Auf dem iPhone haben Safari und die installierte App **getrennte** Speicher.
 | `wall_e_sessions` / `_at` | V2 | Zwischenspeicher des go-e Ladeverlaufs (normalisiert, neueste zuerst) + Zeit der letzten Aktualisierung |
 | `wall_e_sessions_from` | V2 | ab wann der Ladeverlauf schon einmal vollständig nachgeladen wurde (ISO) – verhindert wiederholtes Nachladen |
 | `wall_e_standard_loss` | V2 | pauschaler Ladeverlust in % als Text, z. B. `"1.6"`; fehlt → 1,8 % (V1) |
+| `wall_e_sync` | 2.1 | Gemeinsam nutzen: `{ key, device, auto, notify, devices?, vapidKey? }` – `key` = Gruppenschlüssel (geheim), `device` = Kennung dieses Geräts |
+| `wall_e_sync_inbox` / `_outbox` | 2.1 | Änderungen anderer, die auf „Übernehmen/Ablehnen“ warten / eigene, noch nicht gesendete |
+| `wall_e_sync_stamps` | 2.1 | Zeitpunkt der letzten Änderung je Bereich (`billing`, `prices`, `settings`) – ältere fremde Änderungen werden nicht übernommen |
+| IndexedDB `wall-e` / `kv` / `sync` | 2.1 | Kopie von `{ key, device }` für den Service Worker (Benachrichtigungen) |
 | `wall_e_history_link` | V2 | Export-Link von Hand, falls die Wallbox kein `dll` liefert (Rückfall: alter V1-Schlüssel `goe_export_url`) |
+| `wall_e_seen_version` | 2.1 | App-Version, deren Neuerungen zuletzt gezeigt wurden; fehlt bei bestehenden Nutzern → gilt als 2.0.0. Bleibt bei „Alle Daten löschen“ |
+| `wall_e_sync_removed` | 2.1 | Zeitpunkt, an dem ein anderes Gerät dieses aus „Gemeinsam nutzen“ entfernt hat (Hinweis) |
 | `wall_e_welcome` | V2 | zuletzt gezeigter Willkommens-Bildschirm (`"2"`); bleibt bei „Alle Daten löschen“ stehen |
 | `wall_e_backup_v1` | V2 | automatische Sicherung aller Werte beim ersten Start von V2 `{ at, values }` |
 | `wallbox_sessions`, `wallbox_card_energies`, `goe_auth_cookies`, `goe_export_url` | V1 | Altlasten, ungenutzt, bleiben liegen |
@@ -125,6 +131,31 @@ Kosten = kWh × Preis. Neue Basislinie = aktueller Stand inkl. `cards`.
 - **Grundlage:** Mit Ladeverlauf rechnet V2 pro Ladevorgang statt über Kartenstände. Ladungen ohne Karte
   landen nicht mehr unsichtbar im Ladeverlust, sondern als eigene Zeile (oder anteilig, einstellbar).
 
+## Gemeinsam nutzen (ab 2.1)
+
+Optional. Änderungen werden Ende-zu-Ende verschlüsselt über `server/api/sync.php` an die anderen Geräte weitergereicht.
+
+- **Schlüssel:** 32 zufällige Byte, entstehen auf dem ersten Gerät, reisen nur im Teilen-Link/QR-Code/Datei (Bereich `sync`).
+  Daraus per HKDF (`src/lib/crypto.js`): Gruppen-Kennung und Zugangsnachweis für den Server, AES-256-GCM-Schlüssel
+  (bleibt auf dem Gerät). Der Server speichert nur den SHA-256 des Zugangsnachweises, Geräte-Kennungen und Chiffretext.
+- **Änderung** (`src/lib/sync.js`): `{ v, id, at, by: { name, device }, type, data, text }` – `text` z. B. „Alex hat den
+  Zählerstand eingetragen …“ (Name aus „Das bin ich“). Typen: `meter`, `billing` (Startwert, Abschluss, Bearbeiten, Löschen –
+  ganzer Abrechnungsstand in V1-Formaten), `owners`, `profile`, `prices`, `settings`. Gemeldet von den Schreibfunktionen in
+  `storage.js` (`onLocalChange`), gesammelt 1,5 s, dann gesendet.
+- **Übernehmen** (`applyRemote`): Zählerstand nur, wenn die Ablesung neuer ist; Abrechnung/Preise/Einstellungen nur, wenn
+  die Änderung neuer ist als der eigene Stand; Zuordnungen und Personen werden zusammengeführt. Einspielen meldet keine
+  neue Änderung. Pro Gerät: automatisch übernehmen (Hinweis) oder fragen (oben auf jeder Seite „Übernehmen/Ablehnen“).
+- **Server:** Nachricht bleibt, bis alle anderen Geräte sie übernommen oder abgelehnt haben (dann gelöscht), höchstens 30 Tage.
+  Geräte ohne Meldung seit 60 Tagen werden entfernt; ohne Geräte wird die Gruppe gelöscht. Daten in `api/sync-data/` (gesperrt).
+- **Geräte:** Beim Anmelden schickt jedes Gerät verschlüsselt `{ name, me, label }` (z. B. „Alex“, „iPhone · App“).
+  Der Server führt nur Kennung, „zuletzt aktiv“, Push ja/nein. Jedes Gerät kann ein anderes entfernen; die Kennung ist
+  danach gesperrt (wer den Schlüssel noch hat, kann als neues Gerät beitreten).
+- **Einladen:** Link/QR-Code nur mit dem Bereich `sync` → „Beitreten“, die Daten des Geräts bleiben unverändert.
+  „Meinen Stand an alle senden“ (`snapshot`): Abrechnungen, Personen, Zuordnungen, Preise im Teilen-Format; wird immer
+  nachgefragt, beim Übernehmen wie ein Import (rückgängig machbar), „Das bin ich“ bleibt (notfalls über den Namen).
+- **Benachrichtigungen:** Web-Push ohne Inhalt (VAPID, Schlüssel in `api/sync-data/vapid.pem`). `public/sw.js` holt die
+  offenen Änderungen, entschlüsselt sie auf dem Gerät und zeigt deren Text. iPhone: nur in der installierten App (iOS 16.4+).
+
 ## Teilen & Sichern
 
 Format (Datei = JSON, Link = `…/import#wall-e=1.<z|j><base64url>`, `z` = deflate-raw-komprimiert):
@@ -135,7 +166,8 @@ Format (Datei = JSON, Link = `…/import#wall-e=1.<z|j><base64url>`, `z` = defla
   prices?:   { active, history },
   billing?:  { baseline, startMeter, startMeterAt, currentMeter, currentMeterAt, standardLoss?, periods, snapshots },
   people?:   { profiles, owners, unassignedMode },   // ohne "Das bin ich"
-  settings?: { darkMode }
+  settings?: { darkMode },
+  sync?:     { key }                               // ab 2.1, Gerät bekommt beim Import eine eigene Kennung
 } }
 ```
 

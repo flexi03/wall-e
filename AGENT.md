@@ -18,6 +18,8 @@ Installations-spezifische Notizen (Server, Deploy, Domain) stehen – falls vorh
 - Rechenwege für Kosten stehen in `src/lib/billing.js` / `src/lib/people.js` und sind gegen die V1-Formeln
   getestet (`src/lib/__tests__/fixtures.js` → `v1Compute`). Vor jeder Änderung daran: `npm test`.
 - Vor jedem Deploy im Browser mit V1-Testdaten prüfen (siehe „Testen“).
+- **Jede neue Version:** `package.json` anheben, `CHANGELOG.md` und oben in `src/lib/releases.js` die Neuerungen für
+  Nutzer eintragen – sie erscheinen nach dem Update einmal als „Neu in Wall-E …“. Nie eine Neuinstallation verlangen.
 
 ## Wiederverwendbarkeit
 
@@ -34,7 +36,9 @@ Installations-spezifische Notizen (Server, Deploy, Domain) stehen – falls vorh
 index.html, public/            Manifest, Icons, .htaccess (HTTPS, CSP, SPA-Rewrite, Caching)
 site.config.example.js         Vorlage für eigene Werte (site.config.js, nicht veröffentlicht)
 server/                        PHP-Proxy zur go-e Cloud: api/status.php, api/test.php (Live-Status),
-                               api/history.php (Ladeverlauf), api/goe.php (gemeinsame Funktionen, Retry)
+                               api/history.php (Ladeverlauf), api/goe.php (gemeinsame Funktionen, Retry),
+                               api/sync.php + webpush.php (Gemeinsam nutzen: nur Chiffretext, Push ohne Inhalt)
+public/sw.js                   Service Worker nur für Benachrichtigungen (kein Cache)
 src/
   main.jsx, App.jsx            Einstieg, Routen (+ Weiterleitungen der V1-Adressen)
   lib/storage.js               Datenschicht (localStorage, V1-Schlüssel)
@@ -43,6 +47,9 @@ src/
   lib/history.js               go-e Ladeverlauf laden, normalisieren, zusammenführen
   lib/suggest.js               Kennzahlen pro Ladevorgang, Zuordnungs-Vorschläge nach Ladeleistung
   lib/timeline.js              Zeitleiste der laufenden Abrechnung (Tag/Woche/Monat je Person)
+  lib/crypto.js, lib/sync.js   Gemeinsam nutzen: Verschlüsselung (WebCrypto), Senden/Empfangen über api/sync.php
+  lib/syncText.js, lib/idb.js  Texte der Änderungen („Alex hat …“), Schlüssel-Kopie für den Service Worker
+  hooks/sync.js                SyncProvider: eigene Änderungen senden, fremde übernehmen oder nachfragen
   lib/goe.js                   go-e Status über den Proxy (Timeout, vorübergehende Fehler), Demo-Daten
   lib/share.js                 Teilen & Sichern (Link/QR/Datei), Import mit Rückgängig
   lib/format.js                Zahlen-, Geld-, Datumsformate (de-DE)
@@ -64,6 +71,7 @@ CHANGELOG.md                   Änderungen pro Version
 
 Stack: React 18, react-router 6, Tailwind 3 (Farben als CSS-Variablen), Heroicons 2, Vite 5, Vitest, `qrcode`.
 Keine externen Requests außer zum eigenen Server (CSP `default-src 'self'`). Keine Fonts von außen.
+Gemeinsam nutzen: Der Server darf nie Klartext oder den Schlüssel sehen – alles wird auf dem Gerät ver-/entschlüsselt.
 
 ## Befehle
 

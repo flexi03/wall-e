@@ -6,6 +6,7 @@ import { CheckCircleIcon, UserGroupIcon, ShareIcon, DevicePhoneMobileIcon, Docum
 import { Button } from './ui.jsx';
 import * as store from '../lib/storage.js';
 import { availableSections, buildPayload, saveFile } from '../lib/share.js';
+import packageInfo from '../../package.json';
 
 export const WELCOME_VERSION = '2';
 
@@ -24,6 +25,7 @@ export default function Welcome() {
 
   const finish = () => {
     store.setWelcomeSeen(WELCOME_VERSION);
+    store.setSeenVersion(packageInfo.version); // Neuerungen erst beim nächsten Update
     setShow(false);
   };
 

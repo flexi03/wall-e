@@ -2,7 +2,8 @@
 // Alles passiert im Browser. Beim Link stehen die Daten hinter dem "#" – dieser Teil
 // wird vom Browser nie an einen Server geschickt.
 
-import { KEYS, getRaw, getJson, batch, getWallbox, getPriceHistory, getPeriods, getBaseline, getSnapshots, getProfiles, getSessionOwners, parseNumber } from './storage.js';
+import { KEYS, getRaw, getJson, batch, getWallbox, getPriceHistory, getPeriods, getBaseline, getSnapshots, getProfiles, getSessionOwners, getSync, parseNumber } from './storage.js';
+import { randomId, isGroupKey } from './crypto.js';
 
 export const FORMAT = 'wall-e';
 export const FORMAT_VERSION = 1;
@@ -13,7 +14,8 @@ export const SECTIONS = {
   prices: { label: 'Strompreise', hint: 'Aktiver Preis und Tarife' },
   billing: { label: 'Abrechnungen', hint: 'Zählerstände, laufende und abgeschlossene Abrechnungen' },
   people: { label: 'Personen', hint: 'Profile, Karten und zugeordnete Ladevorgänge' },
-  settings: { label: 'Darstellung', hint: 'Hell/Dunkel' }
+  settings: { label: 'Darstellung', hint: 'Hell/Dunkel' },
+  sync: { label: 'Gemeinsam nutzen', hint: 'Schlüssel, damit das andere Gerät Änderungen mit diesem abgleicht' }
 };
 
 // Aktuelle Daten eines Bereichs auslesen (genau die V1-Formate)
@@ -57,6 +59,10 @@ function readSection(section) {
       const darkMode = getRaw(KEYS.darkMode);
       return darkMode === null ? null : { darkMode };
     }
+    case 'sync': {
+      const sync = getSync();
+      return sync ? { key: sync.key } : null;
+    }
     default:
       return null;
   }
@@ -94,6 +100,7 @@ export function describePayload(payload) {
     items.push({ section: 'people', text: [`${count} Profil${count === 1 ? '' : 'e'}`, assigned ? `${assigned} zugeordnete Ladevorgänge` : null].filter(Boolean).join(' · ') });
   }
   if (d.settings) items.push({ section: 'settings', text: d.settings.darkMode === 'true' ? 'Dunkel' : 'Hell' });
+  if (d.sync) items.push({ section: 'sync', text: 'Änderungen verschlüsselt mit den anderen Geräten abgleichen' });
   return items;
 }
 
@@ -110,6 +117,7 @@ export function validatePayload(payload) {
   }
   if (prices && prices.history && !Array.isArray(prices.history)) throw new Error('Die Strompreise in den Daten sind ungültig.');
   if (billing && billing.periods && !Array.isArray(billing.periods)) throw new Error('Die Abrechnungen in den Daten sind ungültig.');
+  if (payload.data.sync && !isGroupKey(payload.data.sync.key)) throw new Error('Der Schlüssel für „Gemeinsam nutzen“ ist ungültig.');
   const { people } = payload.data;
   if (people && ((people.profiles && !Array.isArray(people.profiles)) || (people.owners && typeof people.owners !== 'object'))) {
     throw new Error('Die Personen in den Daten sind ungültig.');
@@ -151,6 +159,17 @@ export function applyPayload(payload, sections) {
       if ('standardLoss' in d.billing) {
         remember(KEYS.standardLoss);
         set(KEYS.standardLoss, d.billing.standardLoss ?? null);
+      }
+    }
+    if (sections.includes('sync') && d.sync) {
+      // Gleicher Schlüssel → dieses Gerät bleibt, wer es ist; sonst als neues Gerät beitreten
+      const current = getSync();
+      if (!current || current.key !== d.sync.key) {
+        [KEYS.sync, KEYS.syncInbox, KEYS.syncOutbox, KEYS.syncStamps].forEach(remember);
+        setJson(KEYS.sync, { key: d.sync.key, device: randomId(), auto: true, notify: false });
+        set(KEYS.syncInbox, null);
+        set(KEYS.syncOutbox, null);
+        set(KEYS.syncStamps, null);
       }
     }
     if (sections.includes('people') && d.people) {

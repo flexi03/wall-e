@@ -4,6 +4,7 @@ import AppShell from './components/AppShell.jsx';
 import { ToastProvider } from './components/ui.jsx';
 import { StatusProvider, PersonFilterProvider, useThemeEffect } from './hooks/data.js';
 import Welcome from './components/Welcome.jsx';
+import WhatsNew from './components/WhatsNew.jsx';
 import PeoplePage from './pages/PeoplePage.jsx';
 import HistorySettingsPage from './pages/HistorySettingsPage.jsx';
 import LivePage from './pages/LivePage.jsx';
@@ -16,6 +17,8 @@ import SharePage from './pages/SharePage.jsx';
 import ImportPage from './pages/ImportPage.jsx';
 import InfoPage from './pages/InfoPage.jsx';
 import KioskPage from './pages/KioskPage.jsx';
+import SyncPage from './pages/SyncPage.jsx';
+import { SyncProvider } from './hooks/sync.js';
 
 // Adressen aus V1 leiten weiter, damit Lesezeichen und alte Links funktionieren
 const LEGACY_REDIRECTS = {
@@ -34,7 +37,9 @@ export default function App() {
       <StatusProvider>
         <PersonFilterProvider>
           <ToastProvider>
+            <SyncProvider>
             <Welcome />
+            <WhatsNew />
             <Routes>
               <Route path="/kiosk" element={<KioskPage />} />
               <Route element={<AppShell />}>
@@ -47,6 +52,7 @@ export default function App() {
                 <Route path="einstellungen/teilen" element={<SharePage />} />
                 <Route path="einstellungen/personen" element={<PeoplePage />} />
                 <Route path="einstellungen/ladeverlauf" element={<HistorySettingsPage />} />
+                <Route path="einstellungen/gemeinsam" element={<SyncPage />} />
                 <Route path="import" element={<ImportPage />} />
                 <Route path="info" element={<InfoPage />} />
                 {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
@@ -55,6 +61,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
+            </SyncProvider>
           </ToastProvider>
         </PersonFilterProvider>
       </StatusProvider>

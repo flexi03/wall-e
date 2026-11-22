@@ -1,5 +1,5 @@
 import React from 'react';
-import { DevicePhoneMobileIcon, ServerIcon, NoSymbolIcon, EnvelopeIcon, GlobeAltIcon, DocumentTextIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { DevicePhoneMobileIcon, ServerIcon, NoSymbolIcon, EnvelopeIcon, GlobeAltIcon, DocumentTextIcon, ShieldCheckIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { Page, Section, Card, List, ListItem } from '../components/ui.jsx';
 import packageInfo from '../../package.json';
 import site from '@site';
@@ -46,10 +46,14 @@ export default function InfoPage() {
         <List>
           <ListItem icon={DevicePhoneMobileIcon} iconTone="success" title="Alles bleibt auf deinem Gerät" subtitle="Kein Konto, keine Datenbank" chevron={false} />
           <ListItem icon={ServerIcon} title="Abfragen über den Wall-E-Server" subtitle="Weitergeleitet an go-e, nichts gespeichert" chevron={false} />
+          <ListItem icon={LockClosedIcon} iconTone="success" title="Gemeinsam nutzen (freiwillig)" subtitle="Ende-zu-Ende verschlüsselt, nur bis alle es gesehen haben" chevron={false} />
           <ListItem icon={NoSymbolIcon} iconTone="neutral" title="Kein Tracking, keine Cookies" chevron={false} />
         </List>
         <p className="mt-2 px-1 text-caption text-muted">
           Browser dürfen die go-e Cloud nicht direkt abfragen. Deshalb leitet der Wall-E-Server deine Anfrage verschlüsselt weiter. Seriennummer und Token stehen dabei nie in der Adresse und werden nicht gespeichert.
+        </p>
+        <p className="mt-2 px-1 text-caption text-muted">
+          Nur wenn du „Gemeinsam nutzen“ einschaltest: Änderungen werden auf dem Handy verschlüsselt und über den Wall-E-Server an die anderen Geräte weitergereicht. Der Schlüssel reist nur im Teilen-Link mit, der Server sieht ihn nie und kann nichts lesen. Jede Änderung wird gelöscht, sobald alle anderen Geräte sie übernommen oder abgelehnt haben, spätestens nach 30 Tagen. Benachrichtigungen laufen über den Push-Dienst deines Handys (Apple, Google oder Mozilla) und enthalten keinen Inhalt.
         </p>
       </Section>
 

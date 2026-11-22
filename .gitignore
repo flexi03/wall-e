@@ -1,2 +1,4 @@
 node_modules/
 dist/
+server/api/sync-data/
+.DS_Store

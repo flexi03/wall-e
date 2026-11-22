@@ -60,6 +60,8 @@ Karteninnen `p-4 sm:p-5`.
 - `Sheet`, `ConfirmSheet`, `ToastProvider`/`useToast`
 - `PersonDot`, `SplitBar` (`colors`: Farbindex je Zeile, `null` = grau; `highlight`: eine Zeile betonen)
 - `Chip` (Filter zum An-/Ausschalten, gedrückt mit ×)
+- `SyncInbox` (`components/SyncInbox.jsx`): oben auf jeder Seite, solange Änderungen anderer auf eine Entscheidung warten –
+  Text „Name hat …“, Zeit, „Übernehmen“/„Ablehnen“, ab zwei „Alle übernehmen“
 - `Receipt` (Rechenweg als kleine Rechnung: Zeilen mit „+“/„=“, rechts Euro groß und kWh klein)
 - `ExpandRow` (ganze Zeile tippbar, Chevron dreht sich, darunter Inhalt in `surface-2` – z. B. Person → Rechenweg)
 - `Timeline` (Balken je Tag/Woche/Monat, gestapelt in Personenfarben; Antippen oder Wischen wählt einen Balken,
@@ -78,6 +80,8 @@ Neue Muster zuerst hier ergänzen, dann benutzen – keine Einzel-Stile in Seite
 | Live `/` | Status-Badge, Leistung (Hauptzahl), diese Ladung + Karte, laufende Abrechnung, Wallbox-Werte, RFID-Karten |
 | Abrechnung `/abrechnung` | ggf. Hinweis „vorläufig“, Kosten bisher (Hauptzahl) mit Personen zum Aufklappen (Rechenweg je Person), „Abrechnung abschließen“, „Wer hat wann geladen“ (Zeitleiste), Hauszähler, ohne Karte geladen, „So wird gerechnet“ (Rechnung gesamt), Ladeverlust |
 | Verlauf `/verlauf` | Umschalter Ladevorgänge/Abrechnungen. Ladevorgänge nach Monat (alle Monate); ohne Person alle, mit Person „ihre + offene“ – kein weiterer Filter; oben eine Karte „n ohne Zuordnung · Übernehmen“ → Sheet: Auswahl „Alle“ oder eine Person (vorausgewählt: aktuelle Ansicht), Liste aller betroffenen Ladevorgänge (vollständig) mit Haken zum Ab-/Auswählen und „Alle/Keine auswählen“; Text antippen → Detail im selben Sheet mit „Liste“ und „Nur diesen zuordnen“; Bestätigen zählt nur Angehakte; Aktualisieren oben rechts; „Mehrere zuordnen“; Detail-Sheet mit Titel = Beginn, Geladen/Standzeit-Balken; Abrechnungen mit Detail-Sheet, alte Sicherungen |
-| Einstellungen `/einstellungen` | Wallbox, Strompreis, Personen, Ladeverlauf, Teilen & Sichern, Daten übernehmen, Design, Kiosk, Hilfe, Alles löschen |
+| Gemeinsam nutzen `/einstellungen/gemeinsam` | Erklärung + „Einrichten“; eingerichtet: Verbunden (Geräte), „Ich bin“, Jetzt abgleichen, „Automatisch übernehmen“, Benachrichtigungen, Gerät hinzufügen (→ Teilen), Beenden |
+| Einstellungen `/einstellungen` | Wallbox, Strompreis, Personen, Ladeverlauf, Gemeinsam nutzen, Teilen & Sichern, Daten übernehmen, Design, Kiosk, Hilfe, Alles löschen |
+| Neuerungen (Overlay) | einmal nach jedem Update: „Neu in Wall-E x.y.z“, Punkte aus `src/lib/releases.js` (auch übersprungene Versionen), optional eine Aktion, „Weiter“ |
 | Willkommen (Overlay) | einmalig beim ersten Start von V2: Logo, 3 Neuerungen, Hinweis auf Sicherung, „Los geht’s“ |
 | Kiosk `/kiosk` | immer dunkel, sehr große Schrift, Bildschirm bleibt an, ohne Navigation |

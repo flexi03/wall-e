@@ -33,7 +33,10 @@ export function mergeSessions(existing, incoming) {
   return [...byId.values()].sort((a, b) => b.start - a.start);
 }
 
-async function request(link, range) {
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Die go-e Cloud antwortet gelegentlich kurz mit 5xx – dann still bis zu zweimal wiederholen
+async function request(link, range, attempt = 1) {
   const body = { link, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...range };
   let response;
   try {
@@ -44,6 +47,10 @@ async function request(link, range) {
     });
   } catch {
     throw new Error('Keine Internetverbindung');
+  }
+  if (response.status >= 500 && attempt < 3) {
+    await wait(1500 * attempt);
+    return request(link, range, attempt + 1);
   }
   let data = null;
   try {

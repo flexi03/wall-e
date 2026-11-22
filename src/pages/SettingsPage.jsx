@@ -15,12 +15,14 @@ import {
   PlayIcon,
   StopIcon,
   UserGroupIcon,
-  ClockIcon
+  ClockIcon,
+  ArrowsRightLeftIcon
 } from '@heroicons/react/24/outline';
 import { Page, Section, List, ListItem, Segmented, ConfirmSheet, Sheet, useToast } from '../components/ui.jsx';
 import { useStored, useStatus } from '../hooks/data.js';
 import * as store from '../lib/storage.js';
 import { getUndoInfo, undoImport } from '../lib/share.js';
+import { leaveSync } from '../lib/sync.js';
 import { canPromptInstall, promptInstall, onInstallChange, isStandalone, isIos } from '../lib/install.js';
 import { formatPrice, formatDate } from '../lib/format.js';
 import packageInfo from '../../package.json';
@@ -38,6 +40,7 @@ export default function SettingsPage() {
   const theme = useStored(store.getThemePreference);
   const undo = useStored(getUndoInfo);
   const profileCount = useStored(() => store.getProfiles().length);
+  const syncOn = useStored(() => !!store.getSync());
   const installAvailable = useInstallAvailable();
   const [confirm, setConfirm] = useState(null);
   const [iosHelp, setIosHelp] = useState(false);
@@ -71,6 +74,7 @@ export default function SettingsPage() {
 
       <Section title="Daten" footer="Teile deine Einstellungen mit einem anderen Gerät oder sichere sie als Datei.">
         <List>
+          <ListItem icon={ArrowsRightLeftIcon} iconTone="success" title="Gemeinsam nutzen" subtitle="Änderungen mit anderen Handys abgleichen" value={syncOn ? 'An' : 'Aus'} to="/einstellungen/gemeinsam" />
           <ListItem icon={ShareIcon} title="Teilen & Sichern" to="/einstellungen/teilen" />
           <ListItem icon={ArrowDownTrayIcon} title="Daten übernehmen" subtitle="Link, QR-Code oder Datei" to="/import" />
           {undo && <ListItem icon={ArrowUturnLeftIcon} iconTone="warning" title="Letzten Import rückgängig machen" subtitle={`Import vom ${formatDate(undo.at, true)}`} onClick={() => setConfirm('undo')} />}
@@ -122,7 +126,8 @@ export default function SettingsPage() {
         title="Alle Daten löschen?"
         confirmLabel="Endgültig löschen"
         danger
-        onConfirm={() => {
+        onConfirm={async () => {
+          if (store.getSync()) await leaveSync();
           store.clearAll();
           toast('Alle Daten gelöscht');
         }}

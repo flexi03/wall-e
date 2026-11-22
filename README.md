@@ -208,6 +208,9 @@ die nächste Abrechnung beginnt bei null; alle alten Abrechnungen findest du im 
 - **Teilen** passiert nur, wenn du es willst: Der Link enthält die Daten selbst (hinter dem `#`, das wird nie an
   einen Server geschickt), die Datei ist eine normale JSON-Datei. Enthält das Geteilte deinen API-Token, warnt Wall-E.
 - **Sicherung:** Einstellungen → Teilen & Sichern → *Als Datei sichern*. Ein Import lässt sich rückgängig machen.
+- **Gemeinsam nutzen (freiwillig, ab 2.1):** Zählerstände, Zuordnungen, Personen, Preise und Abrechnungen werden zwischen den
+  Handys abgeglichen – Ende-zu-Ende verschlüsselt. Der Schlüssel reist nur im Teilen-Link, der Server sieht nur Zeichensalat und
+  löscht jede Änderung, sobald alle anderen Geräte sie übernommen oder abgelehnt haben. Auf Wunsch mit Benachrichtigung.
 - **Der Proxy** nimmt nur POST-Anfragen an, prüft Seriennummer und Token streng und leitet ausschließlich an go-e weiter.
   Fremde Webseiten können seine Antworten im Browser nicht lesen. Seriennummer und Token stehen nie in einer URL und
   landen so nicht in Server-Logs.

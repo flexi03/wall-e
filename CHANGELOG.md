@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.1.0 (22.11.2026)
+
+- Neu: **Gemeinsam nutzen** (Einstellungen → Gemeinsam nutzen). Zählerstände, Zuordnungen, Personen, Preise, Abrechnungen
+  und Einstellungen der Abrechnung werden zwischen Handys abgeglichen – Ende-zu-Ende verschlüsselt, der Server sieht nur
+  Zeichensalat. Jede Änderung trägt den Namen („Alex hat den Zählerstand eingetragen …“).
+- Pro Gerät einstellbar: automatisch übernehmen oder erst fragen („Übernehmen“/„Ablehnen“ oben auf jeder Seite).
+- Der Server löscht eine Änderung, sobald alle anderen Geräte sie übernommen oder abgelehnt haben (spätestens nach 30 Tagen).
+- Benachrichtigungen bei Änderungen anderer, auch bei geschlossener App (iPhone: installierte App, iOS 16.4+).
+  Der Push selbst ist leer; der Text wird erst auf dem Handy entschlüsselt.
+- Einladen per QR-Code oder Link: Die Einladung enthält nur den Schlüssel, beim Beitreten bleiben die eigenen Daten.
+  „Meinen Stand an alle senden“ schickt Abrechnungen, Personen, Zuordnungen und Preise – die anderen werden gefragt.
+- Personen & Geräte: alle mit Namen und ihren Geräten (z. B. „iPhone · App“), zuletzt aktiv, Geräte entfernen.
+- Neu: Nach jedem Update erscheint einmal „Neu in Wall-E …“ mit den Neuerungen. Es muss nichts neu installiert werden.
+- Ladeverlauf: kurze Serverfehler beim Laden werden still wiederholt.
+
 ## 2.0.1 (22.11.2026)
 
 Genauere Abrechnung – gespeicherte Daten bleiben unverändert.
