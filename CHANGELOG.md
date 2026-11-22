@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.1 (unveröffentlicht)
+## 2.0.1 (22.11.2026)
 
 Genauere Abrechnung – gespeicherte Daten bleiben unverändert.
 
