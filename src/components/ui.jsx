@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { ChevronRightIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import { ChevronDownIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/20/solid';
 
 const cx = (...classes) => classes.filter(Boolean).join(' ');
 
@@ -326,6 +326,99 @@ export function SplitBar({ shares, colors, highlight = null }) {
           />
         );
       })}
+    </div>
+  );
+}
+
+// Rechenweg als kleine Rechnung: Zeilen mit „+“ und „=“, rechts Euro (groß) und kWh (klein).
+// lines: [{ op?: '+' | '=', label, hint?, euro, kwh }]
+export function Receipt({ lines }) {
+  return (
+    <div className="tabular">
+      {lines.map((l, i) => (
+        <div
+          key={i}
+          className={cx(
+            'grid grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-2 py-1.5',
+            l.op === '=' ? 'mt-1 border-t border-line pt-2.5 text-ink' : 'text-muted'
+          )}
+        >
+          <span className="text-body">{l.op || ''}</span>
+          <span className="min-w-0">
+            <span className={cx('block text-body', l.op === '=' && 'font-semibold')}>{l.label}</span>
+            {l.hint && <span className="block text-caption text-muted">{l.hint}</span>}
+          </span>
+          <span className="text-right">
+            <span className={cx('block text-body', l.op === '=' && 'font-semibold')}>{l.euro}</span>
+            <span className="block text-caption text-muted">{l.kwh}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Zeile zum Aufklappen (z. B. Person → ihr Rechenweg). Ganze Zeile ist die Tippfläche.
+export function ExpandRow({ open, onToggle, leading, title, subtitle, value, dimmed, children }) {
+  return (
+    <div className={cx('transition-opacity', dimmed && 'opacity-50')}>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex min-h-11 w-full items-center gap-3 py-3 text-left">
+        {leading}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-body font-semibold text-ink">{title}</span>
+          {subtitle && <span className="tabular block text-caption text-muted">{subtitle}</span>}
+        </span>
+        <span className="tabular text-headline text-ink">{value}</span>
+        <ChevronDownIcon className={cx('h-5 w-5 shrink-0 text-subtle transition-transform', open && 'rotate-180')} aria-hidden="true" />
+      </button>
+      {open && <div className="mb-3 rounded-control bg-surface-2 px-3 py-1.5">{children}</div>}
+    </div>
+  );
+}
+
+// Zeitleiste: ein Balken je Abschnitt, gestapelt nach Person (Farbe über colorOf(key)).
+// Antippen oder Ziehen wählt einen Abschnitt; highlight = Schlüssel der gewählten Person (andere blasser).
+// ticks: [{ index, label }] – Beschriftungen unter den Balken.
+export function Timeline({ buckets, colorOf, selected, onSelect, highlight = null, ticks = [], label }) {
+  const ref = useRef(null);
+  const max = Math.max(0, ...buckets.map((b) => b.kwh));
+  const n = buckets.length;
+  const pick = (e) => {
+    const rect = ref.current.getBoundingClientRect();
+    const i = Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - rect.left) / rect.width) * n)));
+    if (i !== selected) onSelect(i);
+  };
+  return (
+    <div>
+      <div
+        ref={ref}
+        role="img"
+        aria-label={label}
+        className="flex h-28 cursor-pointer touch-pan-y select-none items-end gap-px"
+        onPointerDown={pick}
+        onPointerMove={(e) => e.buttons > 0 && pick(e)}
+      >
+        {buckets.map((b, i) => (
+          <div key={b.start} className={cx('flex h-full min-w-0 flex-1 flex-col justify-end rounded-t', i === selected && 'bg-line')}>
+            <div className="flex flex-col-reverse overflow-hidden rounded-t-[3px]" style={{ height: max > 0 ? `${(b.kwh / max) * 100}%` : 0 }}>
+              {b.parts.map((p) => (
+                <span
+                  key={p.key}
+                  className="block w-full shrink-0 transition-opacity"
+                  style={{ height: `${(p.kwh / b.kwh) * 100}%`, backgroundColor: colorOf(p.key), opacity: highlight && highlight !== p.key ? 0.3 : 1 }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="relative mt-1.5 h-4 text-caption text-subtle" aria-hidden="true">
+        {ticks.map((t) => (
+          <span key={t.index} className="absolute top-0 whitespace-nowrap" style={{ left: `${(t.index / n) * 100}%` }}>
+            {t.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

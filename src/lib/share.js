@@ -39,6 +39,7 @@ function readSection(section) {
         startMeterAt: getRaw(KEYS.startMeterAt),
         currentMeter: getRaw(KEYS.currentMeter),
         currentMeterAt: getRaw(KEYS.currentMeterAt),
+        standardLoss: getRaw(KEYS.standardLoss),
         periods,
         snapshots: getSnapshots()
       };
@@ -146,6 +147,11 @@ export function applyPayload(payload, sections) {
       set(KEYS.currentMeterAt, d.billing.currentMeterAt ?? null);
       setJson(KEYS.periods, d.billing.periods || []);
       setJson(KEYS.snapshots, d.billing.snapshots || []);
+      // seit V2: pauschaler Ladeverlust – ältere Dateien haben ihn nicht, dann bleibt der eigene Wert
+      if ('standardLoss' in d.billing) {
+        remember(KEYS.standardLoss);
+        set(KEYS.standardLoss, d.billing.standardLoss ?? null);
+      }
     }
     if (sections.includes('people') && d.people) {
       [KEYS.profiles, KEYS.sessionOwners, KEYS.unassignedMode].forEach(remember);

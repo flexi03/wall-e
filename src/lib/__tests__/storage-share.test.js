@@ -57,6 +57,28 @@ describe('V1-Daten werden ohne Migration gelesen', () => {
   });
 });
 
+describe('Startwert, Zählerstand und Ladeverlust', () => {
+  it('Startwert korrigieren verschiebt den Beginn der Abrechnung nicht', () => {
+    const start = Date.parse('2026-01-04T18:45:00Z');
+    store.correctStartMeter(4801, start);
+    expect(store.getBaseline().meterReading).toBe(4801);
+    expect(store.getBaseline().at).toBe(new Date(start).toISOString());
+    expect(store.getMeters().start).toBe(4801);
+  });
+
+  it('Zählerstand mit Zeitpunkt der Ablesung', () => {
+    store.setCurrentMeter(5400.5, '2026-10-16T08:00:00.000Z');
+    expect(store.getMeters()).toMatchObject({ current: 5400.5, currentAt: '2026-10-16T08:00:00.000Z' });
+  });
+
+  it('pauschaler Ladeverlust: Standard wie V1, einstellbar', () => {
+    expect(store.getStandardLoss()).toBeCloseTo(0.018, 9);
+    store.setStandardLoss(1.6);
+    expect(store.getRaw('wall_e_standard_loss')).toBe('1.6');
+    expect(store.getStandardLoss()).toBeCloseTo(0.016, 9);
+  });
+});
+
 describe('Teilen & Sichern', () => {
   it('Link hin und zurück (komprimiert)', async () => {
     const payload = buildPayload(availableSections());

@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.0.1 (unveröffentlicht)
+
+Genauere Abrechnung – gespeicherte Daten bleiben unverändert.
+
+- Beginn der Abrechnung gehört jetzt immer zum Startwert des Hauszählers. Vorher konnte ein späteres Startwert-Datum
+  den Beginn verschieben: Ladevorgänge fehlten, ihr Strom landete im Ladeverlust.
+- Ladeverlust wird nur noch über denselben Zeitraum gemessen (Start bis zur letzten Ablesung). Ladungen danach
+  bekommen denselben Faktor – der Hauszähler muss nicht nach jeder Ladung abgelesen werden.
+- Unplausibler Ladeverlust (über 15 %, unter 0 %) oder fehlende Ablesung: vorläufig pauschaler Wert mit Hinweis
+  „bitte Hauszähler ablesen“. Pauschalwert einstellbar (Abrechnung → So wird gerechnet).
+- Zählerstand mit Zeitpunkt der Ablesung („Abgelesen am“).
+- Abrechnung übersichtlicher: „So wird gerechnet“ als kleine Rechnung (Ladevorgänge + Ladeverlust = zu bezahlen,
+  jeweils Euro und kWh); Person antippen zeigt ihren eigenen Rechenweg.
+- Neu: Zeitleiste „Wer hat wann geladen“ – Balken pro Woche (bzw. Tag/Monat) in Personenfarben, antippen für Details. Erinnerung auf der Live-Seite, wenn der Ladeverlust unplausibel ist.
+- Abrechnung „Alle“: oben steht die Summe der Zeilen plus Ladeverlust statt der Hauszähler-Differenz.
+- Fehlen Ladevorgänge seit Beginn der Abrechnung, werden sie einmal gezielt aus dem go-e Verlauf nachgeladen.
+- Zuordnungs-Vorschläge berücksichtigen, seit wann es eine Person/Karte gibt: Eine neue Karte mit gleicher Ladeleistung
+  verhindert keine Vorschläge mehr für Ladungen von davor.
+- Kiosk: Zeile „Nicht zugeordnet“ fehlte (Summe passte nicht zum Gesamtbetrag), Personenfarben wie in der App.
+
 ## 2.0.0 (13.10.2026)
 
 Komplett neu gestaltet – mobil zuerst. Alle Daten aus Version 1 bleiben erhalten, die App muss nicht neu installiert werden.

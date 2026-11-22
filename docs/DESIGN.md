@@ -60,6 +60,10 @@ Karteninnen `p-4 sm:p-5`.
 - `Sheet`, `ConfirmSheet`, `ToastProvider`/`useToast`
 - `PersonDot`, `SplitBar` (`colors`: Farbindex je Zeile, `null` = grau; `highlight`: eine Zeile betonen)
 - `Chip` (Filter zum An-/Ausschalten, gedrückt mit ×)
+- `Receipt` (Rechenweg als kleine Rechnung: Zeilen mit „+“/„=“, rechts Euro groß und kWh klein)
+- `ExpandRow` (ganze Zeile tippbar, Chevron dreht sich, darunter Inhalt in `surface-2` – z. B. Person → Rechenweg)
+- `Timeline` (Balken je Tag/Woche/Monat, gestapelt in Personenfarben; Antippen oder Wischen wählt einen Balken,
+  Details darunter; mit gewählter Person werden andere blasser)
 - `PersonBadge` (Etikett in der Farbe einer Person, z. B. Vorschlag „Name?“), `SplitLegend` (zwei Anteile als Balken mit Stunden und %, z. B. Geladen/Standzeit)
 - `Stat` kürzt nie ab – Werte und Hinweise brechen um, damit in Sheets alles lesbar ist
 - `PersonPicker` (`components/PersonPicker.jsx`): Pille „Alle ▾“ / „Name ▾“ rechts im Seitenkopf von Live,
@@ -72,7 +76,7 @@ Neue Muster zuerst hier ergänzen, dann benutzen – keine Einzel-Stile in Seite
 | Seite | Inhalt |
 |---|---|
 | Live `/` | Status-Badge, Leistung (Hauptzahl), diese Ladung + Karte, laufende Abrechnung, Wallbox-Werte, RFID-Karten |
-| Abrechnung `/abrechnung` | Kosten bisher (Hauptzahl), Aufteilung, „Abrechnung abschließen“, Hauszähler, Rechenweg |
+| Abrechnung `/abrechnung` | ggf. Hinweis „vorläufig“, Kosten bisher (Hauptzahl) mit Personen zum Aufklappen (Rechenweg je Person), „Abrechnung abschließen“, „Wer hat wann geladen“ (Zeitleiste), Hauszähler, ohne Karte geladen, „So wird gerechnet“ (Rechnung gesamt), Ladeverlust |
 | Verlauf `/verlauf` | Umschalter Ladevorgänge/Abrechnungen. Ladevorgänge nach Monat (alle Monate); ohne Person alle, mit Person „ihre + offene“ – kein weiterer Filter; oben eine Karte „n ohne Zuordnung · Übernehmen“ → Sheet: Auswahl „Alle“ oder eine Person (vorausgewählt: aktuelle Ansicht), Liste aller betroffenen Ladevorgänge (vollständig) mit Haken zum Ab-/Auswählen und „Alle/Keine auswählen“; Text antippen → Detail im selben Sheet mit „Liste“ und „Nur diesen zuordnen“; Bestätigen zählt nur Angehakte; Aktualisieren oben rechts; „Mehrere zuordnen“; Detail-Sheet mit Titel = Beginn, Geladen/Standzeit-Balken; Abrechnungen mit Detail-Sheet, alte Sicherungen |
 | Einstellungen `/einstellungen` | Wallbox, Strompreis, Personen, Ladeverlauf, Teilen & Sichern, Daten übernehmen, Design, Kiosk, Hilfe, Alles löschen |
 | Willkommen (Overlay) | einmalig beim ersten Start von V2: Logo, 3 Neuerungen, Hinweis auf Sicherung, „Los geht’s“ |

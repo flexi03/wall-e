@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildPersons, cardNamesFrom, ownerOf, computeFromSessions, groupCardsByPerson, periodStart, sessionsInRange, UNASSIGNED } from '../people.js';
+import { buildPersons, cardNamesFrom, ownerOf, computeFromSessions, groupCardsByPerson, periodStart, sessionsInRange, measureLoss, UNASSIGNED } from '../people.js';
 import { computeCurrentPeriod, closePeriod, splitBreakdown } from '../billing.js';
-import { normalizeSession, mergeSessions } from '../history.js';
+import { normalizeSession, mergeSessions, needsBackfill } from '../history.js';
 import { cards } from './fixtures.js';
 
 const H = 3600 * 1000;
@@ -41,7 +41,7 @@ describe('Personen', () => {
 
 describe('Abrechnung aus Ladevorgängen', () => {
   const persons = buildPersons([], ['Alex', 'Sam Fob']);
-  const meters = { start: 1000, current: 1038.5 }; // 38,5 kWh am Hauszähler, Wallbox 35 → 10 % Verlust
+  const meters = { start: 1000, current: 1035.56 }; // 35,56 kWh am Hauszähler, Wallbox 35 → 1,6 % Verlust
 
   it('eigene Zeile für Ladungen ohne Karte', () => {
     const r = computeFromSessions({ sessions, persons, owners: {}, from: t0, meters, price: 0.4, unassignedMode: 'separate' });
@@ -49,8 +49,9 @@ describe('Abrechnung aus Ladevorgängen', () => {
     expect(r.people.map((p) => p.kwh)).toEqual([10, 20]);
     expect(r.unassigned.kwh).toBe(5);
     expect(r.wallboxKwh).toBe(35);
-    expect(r.factor).toBeCloseTo(1.1, 6);
-    expect(r.totalCost).toBeCloseTo(38.5 * 0.4, 6);
+    expect(r.factor).toBeCloseTo(1.016, 6);
+    expect(r.isStandardLoss).toBe(false);
+    expect(r.totalCost).toBeCloseTo(35.56 * 0.4, 6);
     const sum = r.people.reduce((s, p) => s + p.cost, 0) + r.unassigned.cost;
     expect(sum).toBeCloseTo(r.totalCost, 6);
   });
@@ -60,7 +61,7 @@ describe('Abrechnung aus Ladevorgängen', () => {
     expect(r.unassigned).toBeNull();
     expect(r.people[0].kwh).toBeCloseTo(10 + 5 / 3, 6);
     expect(r.people[1].kwh).toBeCloseTo(20 + 10 / 3, 6);
-    expect(r.people.reduce((s, p) => s + p.cost, 0)).toBeCloseTo(38.5 * 0.4, 6);
+    expect(r.people.reduce((s, p) => s + p.cost, 0)).toBeCloseTo(35.56 * 0.4, 6);
   });
 
   it('zugeordnete Ladung zählt für die Person', () => {
@@ -117,6 +118,90 @@ describe('Startpunkt der laufenden Abrechnung', () => {
     expect(periodStart({ totalEnergyKwh: 1, meterReading: 1, at: '2026-10-01T00:00:00Z' }, [], {})).toBe(t0);
     expect(periodStart({ totalEnergyKwh: 1, meterReading: 1 }, [{ createdAt: '2026-09-01T00:00:00Z' }], { startAt: '2026-10-01T00:00:00Z' })).toBe(t0);
     expect(periodStart({ totalEnergyKwh: null, meterReading: null }, [], {})).toBeNull();
+  });
+
+  it('Startwert vom letzten Abschluss → Beginn ist der Abschluss, auch wenn der Startwert-Zeitpunkt später ist', () => {
+    const close = { createdAt: '2026-01-04T18:45:00Z', meterReading: 2913.13, baselineAfter: { totalEnergyKwh: 2864.1, meterReading: 2913.13 } };
+    const start = periodStart({ totalEnergyKwh: 2864.1, meterReading: 2913.13 }, [close], { startAt: '2026-04-14T17:10:00Z' });
+    expect(start).toBe(Date.parse('2026-01-04T18:45:00Z'));
+  });
+});
+
+describe('Ladeverlust messen (gleicher Zeitraum wie der Hauszähler)', () => {
+  const persons = buildPersons([], ['Alex', 'Sam']);
+  const D = 24 * H;
+  const readAt = t0 + 30 * D;
+  // 100 kWh bis zur Ablesung, danach noch 50 kWh
+  const list = [
+    { id: 'a', start: t0 + 2 * D, end: t0 + 2 * D + 3 * H, kwh: 60, card: 'Alex' },
+    { id: 'b', start: t0 + 9 * D, end: t0 + 9 * D + 3 * H, kwh: 40, card: 'Sam' },
+    { id: 'c', start: t0 + 35 * D, end: t0 + 35 * D + 3 * H, kwh: 50, card: 'Sam' }
+  ];
+  const run = (meters, standardLoss = 0.016) => computeFromSessions({ sessions: list, persons, owners: {}, from: t0, meters, price: 0.3, unassignedMode: 'separate', standardLoss });
+
+  it('nur Ladungen bis zur Ablesung zählen für die Messung, der Faktor gilt für alle', () => {
+    const r = run({ start: 1000, current: 1101.7, currentAt: new Date(readAt).toISOString() });
+    expect(r.wallboxKwhUntilReading).toBe(100);
+    expect(r.lossReason).toBe('measured');
+    expect(r.lossPercent).toBeCloseTo(1.7, 6);
+    expect(r.wallboxKwh).toBe(150);
+    const sum = r.people.reduce((s, p) => s + p.cost, 0);
+    expect(sum).toBeCloseTo(150 * 1.017 * 0.3, 6);
+    expect(r.totalCost).toBeCloseTo(sum, 6);
+    // zu bezahlen = Hauszähler bis zur Ablesung + danach Geladenes × Faktor
+    expect(r.afterReadingKwh).toBe(50);
+    expect(r.paidKwh).toBeCloseTo(101.7 + 50 * 1.017, 6);
+    expect(r.lossKwh).toBeCloseTo(r.paidKwh - 150, 6);
+    const sam = r.people.find((p) => p.name === 'Sam');
+    expect(sam.paidKwh).toBeCloseTo(r.paidKwh * sam.share, 6);
+    expect(sam.lossKwh).toBeCloseTo(sam.paidKwh - 90, 6);
+    expect(r.people.reduce((s, p) => s + p.paidKwh, 0)).toBeCloseTo(r.paidKwh, 6);
+  });
+
+  it('hoher, aber noch plausibler Verlust (bis 15 %) wird gemessen', () => {
+    const r = run({ start: 1000, current: 1110, currentAt: new Date(readAt).toISOString() });
+    expect(r.lossReason).toBe('measured');
+    expect(r.lossPercent).toBeCloseTo(10, 6);
+  });
+
+  it('unplausibler Verlust über 15 % (Zähler veraltet oder Start falsch) → vorläufig mit Pauschalwert', () => {
+    const r = run({ start: 1000, current: 1116, currentAt: new Date(readAt).toISOString() });
+    expect(r.lossReason).toBe('implausible');
+    expect(r.measuredLossPercent).toBeCloseTo(16, 6);
+    expect(r.paidKwh).toBeCloseTo(150 * 1.016, 6);
+    expect(r.isStandardLoss).toBe(true);
+    expect(r.lossPercent).toBeCloseTo(1.6, 6);
+    expect(r.totalCost).toBeCloseTo(150 * 1.016 * 0.3, 6);
+  });
+
+  it('Wallbox mehr als Hauszähler → vorläufig', () => {
+    expect(run({ start: 1000, current: 1090, currentAt: new Date(readAt).toISOString() }).lossReason).toBe('implausible');
+  });
+
+  it('nach dem Abschluss noch nicht abgelesen → vorläufig', () => {
+    const r = run({ start: 1000, current: 1000, currentAt: new Date(t0).toISOString() });
+    expect(r.lossReason).toBe('no-reading');
+    expect(r.lossPercent).toBeCloseTo(1.6, 6);
+  });
+
+  it('zu wenig geladen bis zur Ablesung → vorläufig', () => {
+    expect(measureLoss({ sessions: list, from: t0, meters: { start: 1000, current: 1001, currentAt: new Date(t0 + D).toISOString() } }).reason).toBe('too-little');
+  });
+
+  it('Pauschalwert wie V1, wenn nichts eingestellt ist', () => {
+    const r = computeFromSessions({ sessions: list, persons, owners: {}, from: t0, meters: { start: null, current: null }, price: 0.3, unassignedMode: 'separate' });
+    expect(r.lossPercent).toBeCloseTo(1.8, 6);
+  });
+});
+
+describe('Ladeverlauf ab Beginn der Abrechnung', () => {
+  const D = 24 * H;
+  const cached = [{ id: 'x', start: t0 + 100 * D, end: t0 + 100 * D + H, kwh: 1 }];
+  it('fehlen ältere Ladevorgänge, wird nachgeladen – aber nur einmal', () => {
+    expect(needsBackfill(cached, t0, null)).toBe(true);
+    expect(needsBackfill(cached, t0, t0 - 7 * D)).toBe(false);
+    expect(needsBackfill(cached, t0 + 200 * D, null)).toBe(false);
+    expect(needsBackfill(cached, null, null)).toBe(false);
   });
 });
 
@@ -175,5 +260,69 @@ describe('Vorschläge nach Ladeleistung', () => {
   it('zwei Personen mit gleicher Leistung → kein Vorschlag', () => {
     const powers = new Map([['a', { kw: 11 }], ['b', { kw: 11 }]]);
     expect(suggestOwner(mk('s', 11), powers)).toBeNull();
+  });
+
+  it('neue Karte mit gleicher Leistung zählt erst ab ihrem ersten Ladevorgang', () => {
+    const D = 24 * H;
+    const t = (days) => days * D;
+    const at = (id, day, maxKw, card = null) => ({ ...mk(id, maxKw, card), start: t(day), end: t(day) + 4 * H });
+    const people = buildPersons(
+      [
+        { id: 'b', name: 'B', cards: ['Karte B'], chargeKw: 11, createdAt: new Date(t(50)).toISOString() }, // Profil später angelegt, Karte schon lange da
+        { id: 'c', name: 'C', cards: ['Karte C'], chargeKw: 11, createdAt: new Date(t(100)).toISOString() }
+      ],
+      ['Karte B', 'Karte C']
+    );
+    const list = [at('b1', 1, 11, 'Karte B'), at('old', 40, 10.9), at('c1', 100, 11, 'Karte C'), at('new', 101, 11)];
+    const { suggestions, powers } = suggestAll(list, people, {});
+    expect(powers.get('b').since).toBe(t(1));
+    expect(powers.get('c').since).toBe(t(100));
+    expect(suggestions.get('old').key).toBe('b'); // C gab es damals noch nicht
+    expect(suggestions.has('new')).toBe(false); // danach passen B und C → unklar
+  });
+
+  it('Profil ohne Ladevorgänge zählt ab dem Anlegen', () => {
+    const people = buildPersons([{ id: 'n', name: 'N', cards: ['Neu'], chargeKw: 11, createdAt: new Date(10 * H).toISOString() }], ['Neu']);
+    const powers = personPowers(people, [], {});
+    expect(powers.get('n').since).toBe(10 * H);
+    expect(suggestOwner({ ...mk('s', 11), start: 0 }, powers)).toBeNull();
+    expect(suggestOwner({ ...mk('s', 11), start: 11 * H }, powers).key).toBe('n');
+  });
+});
+
+import { timelineBuckets, timelineUnit, timelineTicks, bucketLabel } from '../timeline.js';
+
+describe('Zeitleiste der laufenden Abrechnung', () => {
+  const D = 24 * H;
+  const persons = buildPersons([], ['Alex', 'Sam']);
+  const from = new Date(2026, 0, 4, 19).getTime(); // Sonntagabend
+  const at = (id, day, kwh, card) => ({ id, start: from + day * D, end: from + day * D + 3 * H, kwh, card });
+  const list = [at('a', 1, 10, 'Alex'), at('b', 2, 20, 'Sam'), at('c', 9, 5, null), at('d', 40, 7, 'Alex'), { id: 'alt', start: from - 5 * D, end: from - 4 * D, kwh: 99, card: 'Alex' }];
+
+  it('Einheit nach Länge des Zeitraums', () => {
+    expect(timelineUnit(20 * D)).toBe('day');
+    expect(timelineUnit(200 * D)).toBe('week');
+    expect(timelineUnit(500 * D)).toBe('month');
+  });
+
+  it('Wochen ab Montag, gestapelt nach Person; Summe = Ladevorgänge der Abrechnung', () => {
+    const { unit, buckets } = timelineBuckets({ sessions: list, persons, owners: {}, from, now: from + 45 * D });
+    expect(unit).toBe('week');
+    expect(new Date(buckets[0].start).getDay()).toBe(1);
+    expect(buckets[0].shownStart).toBe(from);
+    expect(buckets.reduce((s, b) => s + b.kwh, 0)).toBe(42); // ohne den Ladevorgang vor dem Beginn
+    const second = buckets[1];
+    expect(second.parts.map((p) => p.key)).toEqual(['card:Alex', 'card:Sam']);
+    expect(buckets[2].parts).toEqual([{ key: 'none', kwh: 5, count: 1 }]);
+  });
+
+  it('Beschriftungen', () => {
+    const { unit, buckets } = timelineBuckets({ sessions: list, persons, owners: {}, from, now: from + 45 * D });
+    expect(timelineTicks(buckets, unit)[0]).toMatchObject({ index: 0, label: 'Jan' });
+    expect(bucketLabel(buckets[1], unit)).toBe('5.–11. Jan. 2026');
+  });
+
+  it('ohne Ladevorgänge leer', () => {
+    expect(timelineBuckets({ sessions: [], persons, owners: {}, from }).buckets).toEqual([]);
   });
 });

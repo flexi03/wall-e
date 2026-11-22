@@ -3,7 +3,7 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import * as store from '../lib/storage.js';
 import { fetchStatus, demoStatus } from '../lib/goe.js';
 import { computeCurrentPeriod } from '../lib/billing.js';
-import { syncSessions, demoSessions } from '../lib/history.js';
+import { syncSessions, backfillSessions, needsBackfill, demoSessions } from '../lib/history.js';
 import { buildPersons, cardNamesFrom, computeFromSessions, groupCardsByPerson, periodStart } from '../lib/people.js';
 
 // Version, die sich bei jeder gespeicherten Änderung erhöht → Komponenten lesen neu
@@ -115,19 +115,31 @@ function HistoryProvider({ children }) {
   const cached = useStored(store.getCachedSessions);
   const cachedAt = useStored(() => store.getRaw(store.KEYS.sessionsAt));
   const manualLink = useStored(store.getHistoryLink);
+  // Beginn der laufenden Abrechnung: ab dann muss der Verlauf vollständig sein
+  const since = useStored(() => periodStart(store.getBaseline(), store.getPeriods(), store.getMeters()));
+  const coveredFrom = useStored(store.getSessionsCoveredFrom);
   const link = (status && status.historyLink) || manualLink || '';
   const [state, setState] = useState({ loading: false, error: '' });
   const busy = useRef(false);
+  const backfill = !demo && needsBackfill(cached, since, coveredFrom);
 
   const sync = useCallback(
     async (force = false) => {
       if (demo || !active || !link || busy.current) return;
-      if (!force && cachedAt && Date.now() - Date.parse(cachedAt) < HISTORY_MIN_INTERVAL) return;
+      const fresh = cachedAt && Date.now() - Date.parse(cachedAt) < HISTORY_MIN_INTERVAL;
+      if (!force && fresh && !backfill) return;
       busy.current = true;
       setState({ loading: true, error: '' });
       try {
-        const sessions = await syncSessions(link, store.getCachedSessions());
-        store.setCachedSessions(sessions);
+        let sessions = store.getCachedSessions();
+        if (force || !fresh || sessions.length === 0) sessions = await syncSessions(link, sessions);
+        let covered;
+        if (needsBackfill(sessions, since, store.getSessionsCoveredFrom())) {
+          const result = await backfillSessions(link, sessions, since);
+          sessions = result.sessions;
+          covered = result.coveredFrom;
+        }
+        store.setCachedSessions(sessions, covered);
         setState({ loading: false, error: '' });
       } catch (error) {
         setState({ loading: false, error: error.message });
@@ -135,7 +147,7 @@ function HistoryProvider({ children }) {
         busy.current = false;
       }
     },
-    [demo, active, link, cachedAt]
+    [demo, active, link, cachedAt, backfill, since]
   );
 
   useEffect(() => {
@@ -202,25 +214,26 @@ const DEMO_BILLING = {
   baseline: { totalEnergyKwh: 2010, meterReading: 6120, cards: { Alex: 1600.2, Sam: 380.1 }, at: new Date(Date.now() - 20 * 86400000).toISOString() },
   meters: { start: 6120, current: 6290.4, startAt: new Date(Date.now() - 20 * 86400000).toISOString(), currentAt: new Date().toISOString() },
   price: { value: 0.34, isSet: true },
-  periods: []
+  periods: [],
+  standardLoss: 0.018
 };
 
 export function useBilling() {
   const { status, demo } = useStatus();
   const history = useHistory();
   const { persons, owners, unassignedMode } = usePeople();
-  const stored = useStored(() => ({ baseline: store.getBaseline(), meters: store.getMeters(), price: store.getPrice(), periods: store.getPeriods() }));
+  const stored = useStored(() => ({ baseline: store.getBaseline(), meters: store.getMeters(), price: store.getPrice(), periods: store.getPeriods(), standardLoss: store.getStandardLoss() }));
   const source = demo ? DEMO_BILLING : stored;
   const from = useMemo(() => periodStart(source.baseline, source.periods, source.meters), [source]);
 
   const current = useMemo(() => {
     // Mit Ladeverlauf: pro Ladevorgang. Sonst wie V1 über die Kartenstände (braucht den Live-Status).
     if (history.available) {
-      const result = computeFromSessions({ sessions: history.sessions, persons, owners, from, meters: source.meters, price: source.price.value, unassignedMode });
+      const result = computeFromSessions({ sessions: history.sessions, persons, owners, from, meters: source.meters, price: source.price.value, unassignedMode, standardLoss: source.standardLoss });
       return status ? { ...result, totals: computeCurrentPeriod({ cards: status.cards, baseline: source.baseline, meters: source.meters, price: source.price.value }).totals } : result;
     }
     if (!status) return null;
-    return groupCardsByPerson(computeCurrentPeriod({ cards: status.cards, baseline: source.baseline, meters: source.meters, price: source.price.value }), persons);
+    return groupCardsByPerson(computeCurrentPeriod({ cards: status.cards, baseline: source.baseline, meters: source.meters, price: source.price.value, standardLoss: source.standardLoss }), persons);
   }, [history.available, history.sessions, persons, owners, from, source, unassignedMode, status]);
 
   return { ...source, from, current, demo };

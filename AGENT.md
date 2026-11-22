@@ -42,6 +42,7 @@ src/
   lib/people.js                Personen/Profile, Zuordnung, Abrechnung nach Ladevorgängen
   lib/history.js               go-e Ladeverlauf laden, normalisieren, zusammenführen
   lib/suggest.js               Kennzahlen pro Ladevorgang, Zuordnungs-Vorschläge nach Ladeleistung
+  lib/timeline.js              Zeitleiste der laufenden Abrechnung (Tag/Woche/Monat je Person)
   lib/goe.js                   go-e Status über den Proxy (Timeout, vorübergehende Fehler), Demo-Daten
   lib/share.js                 Teilen & Sichern (Link/QR/Datei), Import mit Rückgängig
   lib/format.js                Zahlen-, Geld-, Datumsformate (de-DE)

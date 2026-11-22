@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Badge, PersonDot, Spinner } from '../components/ui.jsx';
 import { useStatus, useBilling } from '../hooks/data.js';
+import { billingRows } from '../lib/people.js';
 import { formatEuro, formatKwh, formatNumber, formatRelative } from '../lib/format.js';
 
 function useWakeLock() {
@@ -85,9 +86,9 @@ export default function KioskPage() {
             <div className="tabular mt-1 text-[3.5rem] font-bold leading-tight">{current ? formatEuro(current.totalCost) : '–'}</div>
             <div className="mt-6 flex-1 divide-y divide-line">
               {current &&
-                current.people.map((p, i) => (
-                  <div key={p.name} className="flex items-center gap-4 py-4">
-                    <PersonDot index={i} className="h-4 w-4" />
+                billingRows(current).map((p) => (
+                  <div key={p.key} className="flex items-center gap-4 py-4">
+                    {p.unassigned ? <span className="h-4 w-4 shrink-0 rounded-full bg-subtle" aria-hidden="true" /> : <PersonDot index={p.colorIndex} className="h-4 w-4" />}
                     <span className="flex-1 truncate text-title font-semibold">{p.name}</span>
                     <span className="tabular text-headline text-muted">{formatKwh(p.kwh)}</span>
                     <span className="tabular w-36 text-right text-title font-semibold">{formatEuro(p.cost)}</span>

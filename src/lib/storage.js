@@ -4,6 +4,7 @@
 // vorhandene Daten ohne Migration erhalten, und ein Zurückrollen auf V1 ist jederzeit
 // möglich. Neue Werte bekommen neue Schlüssel mit Präfix "wall_e_".
 // Übersicht aller Schlüssel: docs/DATA.md
+import { STANDARD_LOSS } from './billing.js';
 
 export const KEYS = {
   // Wallbox-Zugang (V1)
@@ -32,6 +33,8 @@ export const KEYS = {
   me: 'wall_e_me', // Profil dieses Geräts ("Das bin ich") – wird nicht geteilt
   sessions: 'wall_e_sessions', // Zwischenspeicher des go-e Ladeverlaufs
   sessionsAt: 'wall_e_sessions_at',
+  sessionsFrom: 'wall_e_sessions_from', // ab wann der Ladeverlauf vollständig geladen wurde (ISO)
+  standardLoss: 'wall_e_standard_loss', // pauschaler Ladeverlust in %, solange keine Messung möglich ist
   historyLink: 'wall_e_history_link', // Export-Link, falls die Wallbox keinen liefert
   welcome: 'wall_e_welcome', // zuletzt gezeigter Willkommens-Bildschirm (Version)
   backupV1: 'wall_e_backup_v1' // automatische Sicherung beim ersten Start von V2
@@ -249,10 +252,11 @@ export function getMeters() {
   };
 }
 
-export function setCurrentMeter(value) {
+// at = Zeitpunkt der Ablesung (ISO), Standard: jetzt
+export function setCurrentMeter(value, at) {
   batch(({ set }) => {
     set(KEYS.currentMeter, value === null ? null : String(value));
-    set(KEYS.currentMeterAt, value === null ? null : new Date().toISOString());
+    set(KEYS.currentMeterAt, value === null ? null : at || new Date().toISOString());
   });
 }
 
@@ -271,14 +275,25 @@ export function setStartMeter(value, wallboxTotals) {
   });
 }
 
-// Nur die Zahl des Startwerts korrigieren, Kartenstände der Basislinie bleiben
-export function correctStartMeter(value) {
+// Nur die Zahl des Startwerts korrigieren. Kartenstände und Beginn der Abrechnung bleiben:
+// periodStartMs = bisheriger Beginn, wird in der Basislinie festgehalten (sonst würde er sich verschieben).
+export function correctStartMeter(value, periodStartMs = null) {
   const baseline = getBaseline();
+  const at = baseline.at || (typeof periodStartMs === 'number' && !isNaN(periodStartMs) ? new Date(periodStartMs).toISOString() : null);
   batch(({ set, setJson: sj }) => {
     set(KEYS.startMeter, String(value));
-    set(KEYS.startMeterAt, new Date().toISOString());
-    sj(KEYS.baseline, { ...baseline, meterReading: value });
+    sj(KEYS.baseline, { ...baseline, meterReading: value, ...(at ? { at } : {}) });
   });
+}
+
+// Pauschaler Ladeverlust (Anteil, z. B. 0.016), solange der Hauszähler keine plausible Messung erlaubt
+export function getStandardLoss() {
+  const percent = parseNumber(getRaw(KEYS.standardLoss));
+  return percent >= 0 && percent <= 20 ? percent / 100 : STANDARD_LOSS;
+}
+
+export function setStandardLoss(percent) {
+  setRaw(KEYS.standardLoss, percent === null || isNaN(percent) ? null : String(percent));
 }
 
 export function getPeriods() {
@@ -411,11 +426,18 @@ export function getCachedSessions() {
   return Array.isArray(sessions) ? sessions : [];
 }
 
-export function setCachedSessions(sessions) {
+export function setCachedSessions(sessions, coveredFromMs) {
   batch(({ set, setJson: sj }) => {
     sj(KEYS.sessions, sessions);
     set(KEYS.sessionsAt, new Date().toISOString());
+    if (typeof coveredFromMs === 'number') set(KEYS.sessionsFrom, new Date(coveredFromMs).toISOString());
   });
+}
+
+export function getSessionsCoveredFrom() {
+  const raw = getRaw(KEYS.sessionsFrom);
+  const ms = raw ? Date.parse(raw) : NaN;
+  return isNaN(ms) ? null : ms;
 }
 
 export function getHistoryLink() {

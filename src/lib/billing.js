@@ -34,8 +34,9 @@ export function wallboxTotals(cards) {
  * @param {object} input.baseline   { totalEnergyKwh, meterReading, cards? } – Stand beim letzten Abschluss
  * @param {object} input.meters     { start, current } – Hauszähler in kWh
  * @param {number} input.price      €/kWh
+ * @param {number} [input.standardLoss] pauschaler Ladeverlust (Anteil), Standard wie V1 1,8 %
  */
-export function computeCurrentPeriod({ cards, baseline, meters, price }) {
+export function computeCurrentPeriod({ cards, baseline, meters, price, standardLoss = STANDARD_LOSS }) {
   const users = cardsToUsers(cards);
   const totalRaw = users.reduce((sum, u) => sum + u.totalKwh, 0);
   const hasBaseline =
@@ -65,7 +66,7 @@ export function computeCurrentPeriod({ cards, baseline, meters, price }) {
   // Ladeverlust: Hauszähler / Wallbox. Unplausibel (≤ 0 %) → Standard 1,8 % (wie V1)
   let factor = meterKwh && wallboxKwh > 0 ? meterKwh / wallboxKwh : 1;
   const isStandardLoss = factor <= 1;
-  if (isStandardLoss) factor = 1 + STANDARD_LOSS;
+  if (isStandardLoss) factor = 1 + standardLoss;
 
   const people = periodUsers.map((u) => {
     const baseCost = u.kwh * price;
@@ -74,6 +75,8 @@ export function computeCurrentPeriod({ cards, baseline, meters, price }) {
       cardIndex: u.cardIndex,
       kwh: u.kwh,
       share: wallboxKwh > 0 ? u.kwh / wallboxKwh : 0,
+      paidKwh: u.kwh * factor,
+      lossKwh: u.kwh * (factor - 1),
       baseCost,
       cost: baseCost * factor
     };
@@ -85,6 +88,8 @@ export function computeCurrentPeriod({ cards, baseline, meters, price }) {
   return {
     people,
     wallboxKwh,
+    paidKwh: isStandardLoss ? wallboxKwh * factor : meterKwh,
+    lossKwh: isStandardLoss ? wallboxKwh * (factor - 1) : meterKwh - wallboxKwh,
     meterKwh,
     lossPercent: (factor - 1) * 100,
     isStandardLoss,

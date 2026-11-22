@@ -4,6 +4,10 @@
 // Ein Profil kann diesen Wert angeben; ohne Angabe wird er aus den bereits zugeordneten
 // Ladevorgängen gelernt (Median der Spitzenleistung). Ein Ladevorgang ohne Zuordnung bekommt
 // einen Vorschlag, wenn genau eine Person eindeutig passt.
+//
+// Eine Person kommt erst ab dem Zeitpunkt in Frage, ab dem es sie an der Wallbox gibt: erster Ladevorgang mit
+// ihrer Karte (oder ihr zugeordnet), ohne Ladevorgänge das Anlegen des Profils. Eine neue Karte mit gleicher
+// Ladeleistung verdrängt so keine Vorschläge für ältere Ladungen.
 
 import { ownerOf, UNASSIGNED } from './people.js';
 
@@ -40,13 +44,15 @@ function median(values) {
 }
 
 /**
- * Typische Ladeleistung jeder Person.
- * @returns Map<personKey, { kw, learned, samples }>
+ * Typische Ladeleistung jeder Person und seit wann es sie gibt.
+ * @returns Map<personKey, { kw, learned, samples, since (ms) | null }>
  */
 export function personPowers(persons, sessions, owners) {
   const peaks = new Map();
+  const firstSeen = new Map();
   sessions.forEach((s) => {
     const owner = ownerOf(s, persons, owners);
+    if (owner !== UNASSIGNED && (!firstSeen.has(owner) || s.start < firstSeen.get(owner))) firstSeen.set(owner, s.start);
     const { peakKw } = sessionStats(s);
     if (owner === UNASSIGNED || !peakKw || s.kwh < 1) return; // Kurz-Ladungen verfälschen den Wert
     if (!peaks.has(owner)) peaks.set(owner, []);
@@ -55,8 +61,10 @@ export function personPowers(persons, sessions, owners) {
   const result = new Map();
   persons.forEach((p) => {
     const samples = peaks.get(p.key) || [];
-    if (p.chargeKw > 0) result.set(p.key, { kw: p.chargeKw, learned: false, samples: samples.length });
-    else if (samples.length >= MIN_LEARN_SAMPLES) result.set(p.key, { kw: median(samples), learned: true, samples: samples.length });
+    const created = p.createdAt ? Date.parse(p.createdAt) : NaN;
+    const since = firstSeen.has(p.key) ? firstSeen.get(p.key) : isNaN(created) ? null : created;
+    if (p.chargeKw > 0) result.set(p.key, { kw: p.chargeKw, learned: false, samples: samples.length, since });
+    else if (samples.length >= MIN_LEARN_SAMPLES) result.set(p.key, { kw: median(samples), learned: true, samples: samples.length, since });
   });
   return result;
 }
@@ -66,10 +74,12 @@ export function suggestOwner(session, powers) {
   const { peakKw } = sessionStats(session);
   if (!peakKw || powers.size === 0) return null;
   const ranked = [...powers.entries()]
+    // nur Personen, die es zum Zeitpunkt der Ladung schon gab
+    .filter(([, { since }]) => since === null || since === undefined || since <= session.start)
     .map(([key, { kw }]) => ({ key, kw, diff: Math.abs(peakKw - kw) / kw }))
     .sort((a, b) => a.diff - b.diff);
   const [best, second] = ranked;
-  if (best.diff > MATCH_TOLERANCE) return null;
+  if (!best || best.diff > MATCH_TOLERANCE) return null;
   if (second && second.diff - best.diff < MIN_GAP) return null;
   return { key: best.key, kw: best.kw, diff: best.diff };
 }

@@ -7,7 +7,7 @@ import { useStatus, useBilling, usePersonFilter } from '../hooks/data.js';
 import PersonPicker from '../components/PersonPicker.jsx';
 import { billingRows } from '../lib/people.js';
 import * as store from '../lib/storage.js';
-import { formatKw, formatKwh, formatEuro, formatRelative, formatNumber } from '../lib/format.js';
+import { formatKw, formatKwh, formatEuro, formatRelative, formatNumber, formatPercent } from '../lib/format.js';
 
 export function DemoBanner() {
   return (
@@ -82,6 +82,12 @@ function PeriodPreview({ current, person }) {
   if (rows.length === 0 && !person) return null;
   return (
     <Section title={person ? 'Dein Anteil an der laufenden Abrechnung' : 'Laufende Abrechnung'} action={<Link to="/abrechnung" className="text-caption font-semibold text-primary">Details</Link>}>
+      {current.lossReason === 'implausible' && (
+        <Link to="/abrechnung" className="mb-3 flex items-center gap-2 rounded-card bg-warning-soft px-4 py-3 text-caption text-ink">
+          <ExclamationTriangleIcon className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
+          <span className="flex-1">Ladeverlust unplausibel ({formatPercent(current.measuredLossPercent)}) – bitte Hauszähler ablesen. Bis dahin vorläufig {formatPercent(current.lossPercent)}.</span>
+        </Link>
+      )}
       <List>
         {rows.length === 0 && <ListItem title="Seit dem Start noch nichts geladen" value={formatEuro(0)} to="/abrechnung" chevron={false} />}
         {rows.map((r) => (

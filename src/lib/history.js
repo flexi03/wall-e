@@ -75,6 +75,23 @@ export async function syncSessions(link, cached) {
   return mergeSessions(cached, recent);
 }
 
+// Fehlen Ladevorgänge vom Beginn der Abrechnung (z. B. weil go-e beim ersten Laden nur einen Teil geliefert hat),
+// gezielt den Zeitraum ab Beginn bis zum ältesten vorhandenen Ladevorgang nachladen.
+// coveredFrom = ab wann der Verlauf schon einmal vollständig angefragt wurde (verhindert wiederholtes Nachladen).
+export function needsBackfill(cached, since, coveredFrom) {
+  if (typeof since !== 'number' || isNaN(since)) return false;
+  if (coveredFrom !== null && coveredFrom <= since - 7 * DAY) return false;
+  const oldest = cached.length ? Math.min(...cached.map((s) => s.start)) : Infinity;
+  return oldest > since;
+}
+
+export async function backfillSessions(link, cached, since) {
+  const from = since - 7 * DAY;
+  const oldest = cached.length ? Math.min(...cached.map((s) => s.start)) : Date.now();
+  const older = await request(link, { from, to: oldest + DAY });
+  return { sessions: mergeSessions(cached, older), coveredFrom: from };
+}
+
 // Demo-Verlauf passend zu den Demo-Karten: "Alex" lädt einphasig (≈ 3,7 kW), "Sam" dreiphasig (≈ 11 kW)
 export function demoSessions() {
   const now = Date.now();
